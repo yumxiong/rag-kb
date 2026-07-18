@@ -11,7 +11,10 @@ from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
 
 from langchain_community.document_loaders import (
-    PyPDFLoader, TextLoader, UnstructuredWordDocumentLoader)
+    PyPDFLoader,
+    TextLoader,
+    UnstructuredWordDocumentLoader,
+)
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 

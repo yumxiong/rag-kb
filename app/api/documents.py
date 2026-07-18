@@ -10,8 +10,7 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import (APIRouter, BackgroundTasks, Depends, File, HTTPException,
-                     UploadFile)
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 
 from app.api.auth import require_admin
@@ -753,8 +752,7 @@ async def get_pdf_info(document_id: str, _: dict = Depends(require_admin)):
             if not (file_path and os.path.exists(file_path)):
                 return {"success": False, "message": "PDF文件路径未找到或文件已移动"}
             try:
-                from app.core.enhanced_pdf_processor import \
-                    EnhancedPDFProcessor
+                from app.core.enhanced_pdf_processor import EnhancedPDFProcessor
 
                 pdf_processor = EnhancedPDFProcessor()
                 processing_info = pdf_processor.get_processing_info(file_path)

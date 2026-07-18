@@ -14,8 +14,7 @@ from app.core.config import settings
 from app.core.qa_engine import QAEngine
 from app.core.url_safety import is_safe_base_url
 from app.core.vector_store import VectorStore
-from app.models.schemas import (QuestionRequest, QuestionResponse,
-                                SourceDocument)
+from app.models.schemas import QuestionRequest, QuestionResponse, SourceDocument
 
 logger = logging.getLogger(__name__)
 
