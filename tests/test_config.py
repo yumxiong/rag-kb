@@ -1,14 +1,15 @@
 """
 Config 模块单元测试
 """
-import pytest
+
+import base64
 import os
 import tempfile
-import base64
-from unittest.mock import patch, mock_open, Mock
+from unittest.mock import Mock, mock_open, patch
+
+import pytest
 
 from app.core.config import Settings
-
 
 
 # 为本文件的测试隔离环境变量，避免 .env 或全局环境干扰默认值/优先级
@@ -16,18 +17,24 @@ from app.core.config import Settings
 def isolate_env_for_config_tests(mock_openai_key):
     # 仅保留对这些测试安全且必要的最小环境；
     # 依赖 conftest.py 的 mock_openai_key，随后再清空以避免其影响
-    with patch.dict(os.environ, {
-        'LLM_PROVIDER': 'openai',
-        'EMBEDDING_PROVIDER': 'openai',
-    }, clear=True):
+    with patch.dict(
+        os.environ,
+        {
+            "LLM_PROVIDER": "openai",
+            "EMBEDDING_PROVIDER": "openai",
+        },
+        clear=True,
+    ):
         # 禁用 pydantic-settings 对 .env 的读取，避免外部 .env 污染
         try:
             from pydantic_settings.sources import DotEnvSettingsSource
+
             with patch.object(DotEnvSettingsSource, "_read_env_files", return_value={}):
                 # 默认屏蔽系统 keyring，避免读取真实密钥
                 try:
                     import keyring  # noqa: F401
-                    with patch('keyring.get_password', return_value=None):
+
+                    with patch("keyring.get_password", return_value=None):
                         yield
                 except ImportError:
                     # 无 keyring 安装时，直接继续
@@ -35,6 +42,7 @@ def isolate_env_for_config_tests(mock_openai_key):
         except Exception:
             # 若 patch 失败，也至少保证环境变量已被清空
             yield
+
 
 # 模块级临时目录fixture，供两个测试类共享
 @pytest.fixture
@@ -45,18 +53,15 @@ def temp_dirs():
         chroma_dir = os.path.join(temp_dir, "chroma")
         yield upload_dir, chroma_dir
 
+
 class TestSettings:
     """Settings 测试类"""
-
 
     def test_default_initialization(self, temp_dirs):
         """测试默认初始化"""
         upload_dir, chroma_dir = temp_dirs
 
-        settings = Settings(
-            upload_dir=upload_dir,
-            chroma_db_path=chroma_dir
-        )
+        settings = Settings(upload_dir=upload_dir, chroma_db_path=chroma_dir)
 
         # 验证默认值
         assert settings.app_name == "RAG Knowledge Base"
@@ -87,7 +92,7 @@ class TestSettings:
             chat_model="deepseek-chat",
             chunk_size=2000,
             upload_dir=upload_dir,
-            chroma_db_path=chroma_dir
+            chroma_db_path=chroma_dir,
         )
 
         assert settings.app_name == "Custom RAG"
@@ -101,9 +106,7 @@ class TestSettings:
         upload_dir, chroma_dir = temp_dirs
 
         settings = Settings(
-            api_key="direct-api-key",
-            upload_dir=upload_dir,
-            chroma_db_path=chroma_dir
+            api_key="direct-api-key", upload_dir=upload_dir, chroma_db_path=chroma_dir
         )
 
         assert settings.get_api_key() == "direct-api-key"
@@ -113,7 +116,7 @@ class TestSettings:
         upload_dir, chroma_dir = temp_dirs
 
         # 创建临时API key文件
-        with tempfile.NamedTemporaryFile(mode='w', delete=False) as key_file:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as key_file:
             key_file.write("file-api-key")
             key_file_path = key_file.name
 
@@ -121,7 +124,7 @@ class TestSettings:
             settings = Settings(
                 api_key_file=key_file_path,
                 upload_dir=upload_dir,
-                chroma_db_path=chroma_dir
+                chroma_db_path=chroma_dir,
             )
 
             assert settings.get_api_key() == "file-api-key"
@@ -135,7 +138,7 @@ class TestSettings:
         settings = Settings(
             api_key_file="/nonexistent/path/key.txt",
             upload_dir=upload_dir,
-            chroma_db_path=chroma_dir
+            chroma_db_path=chroma_dir,
         )
 
         # 应该返回None而不是抛出异常
@@ -150,9 +153,7 @@ class TestSettings:
         encoded_key = base64.b64encode(original_key.encode()).decode()
 
         settings = Settings(
-            api_key_base64=encoded_key,
-            upload_dir=upload_dir,
-            chroma_db_path=chroma_dir
+            api_key_base64=encoded_key, upload_dir=upload_dir, chroma_db_path=chroma_dir
         )
 
         assert settings.get_api_key() == original_key
@@ -164,7 +165,7 @@ class TestSettings:
         settings = Settings(
             api_key_base64="invalid-base64",
             upload_dir=upload_dir,
-            chroma_db_path=chroma_dir
+            chroma_db_path=chroma_dir,
         )
 
         # 应该返回None而不是抛出异常
@@ -177,7 +178,7 @@ class TestSettings:
         settings = Settings(
             jwt_secret="test-jwt-secret",
             upload_dir=upload_dir,
-            chroma_db_path=chroma_dir
+            chroma_db_path=chroma_dir,
         )
 
         assert settings.get_jwt_secret() == "test-jwt-secret"
@@ -186,10 +187,7 @@ class TestSettings:
         """测试JWT密钥缺失时抛出异常"""
         upload_dir, chroma_dir = temp_dirs
 
-        settings = Settings(
-            upload_dir=upload_dir,
-            chroma_db_path=chroma_dir
-        )
+        settings = Settings(upload_dir=upload_dir, chroma_db_path=chroma_dir)
 
         with pytest.raises(RuntimeError):
             settings.get_jwt_secret()
@@ -204,19 +202,19 @@ class TestSettings:
         settings = Settings(
             admin_password_hash_base64=encoded_hash,
             upload_dir=upload_dir,
-            chroma_db_path=chroma_dir
+            chroma_db_path=chroma_dir,
         )
 
-        assert settings.get_admin_password_hash() == "$argon2id$v=19$m=65536,t=3,p=4$base64$hash"
+        assert (
+            settings.get_admin_password_hash()
+            == "$argon2id$v=19$m=65536,t=3,p=4$base64$hash"
+        )
 
     def test_get_admin_password_hash_missing_raises(self, temp_dirs):
         """测试管理员密码哈希缺失时抛出异常"""
         upload_dir, chroma_dir = temp_dirs
 
-        settings = Settings(
-            upload_dir=upload_dir,
-            chroma_db_path=chroma_dir
-        )
+        settings = Settings(upload_dir=upload_dir, chroma_db_path=chroma_dir)
 
         with pytest.raises(RuntimeError):
             settings.get_admin_password_hash()
@@ -228,7 +226,7 @@ class TestSettings:
         settings = Settings(
             openai_api_key="legacy-openai-key",
             upload_dir=upload_dir,
-            chroma_db_path=chroma_dir
+            chroma_db_path=chroma_dir,
         )
 
         assert settings.get_api_key() == "legacy-openai-key"
@@ -239,7 +237,7 @@ class TestSettings:
         upload_dir, chroma_dir = temp_dirs
 
         # 创建临时文件
-        with tempfile.NamedTemporaryFile(mode='w', delete=False) as key_file:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as key_file:
             key_file.write("file-key")
             key_file_path = key_file.name
 
@@ -250,7 +248,7 @@ class TestSettings:
                 api_key_base64=base64.b64encode(b"base64-key").decode(),
                 openai_api_key="openai-key",
                 upload_dir=upload_dir,
-                chroma_db_path=chroma_dir
+                chroma_db_path=chroma_dir,
             )
 
             # 应该返回direct-key（优先级最高）
@@ -266,13 +264,13 @@ class TestSettings:
             # 不设置直接的api_key
             openai_api_key="fallback-openai-key",
             upload_dir=upload_dir,
-            chroma_db_path=chroma_dir
+            chroma_db_path=chroma_dir,
         )
 
         # 应该回退到openai_api_key
         assert settings.get_api_key() == "fallback-openai-key"
 
-    @patch('os.path.exists')
+    @patch("os.path.exists")
     def test_get_api_key_from_docker_secrets(self, mock_exists, temp_dirs):
         """测试从Docker secrets获取API key"""
         upload_dir, chroma_dir = temp_dirs
@@ -280,40 +278,42 @@ class TestSettings:
         # 模拟Docker secret文件存在
         mock_exists.return_value = True
 
-        with patch('builtins.open', mock_open(read_data='docker-secret-key')):
+        with patch("builtins.open", mock_open(read_data="docker-secret-key")):
             settings = Settings(
                 llm_provider="deepseek",
                 upload_dir=upload_dir,
-                chroma_db_path=chroma_dir
+                chroma_db_path=chroma_dir,
             )
 
             api_key = settings.get_api_key()
             assert api_key == "docker-secret-key"
 
             # 验证正确的secret路径被检查
-            mock_exists.assert_called_with("/run/secrets/openai_api_key/deepseek_api_key")
+            mock_exists.assert_called_with(
+                "/run/secrets/openai_api_key/deepseek_api_key"
+            )
 
-    @patch('os.path.exists')
+    @patch("os.path.exists")
     def test_get_api_key_from_docker_secrets_openai(self, mock_exists, temp_dirs):
         """测试从Docker secrets获取OpenAI API key"""
         upload_dir, chroma_dir = temp_dirs
 
         mock_exists.return_value = True
 
-        with patch('builtins.open', mock_open(read_data='openai-docker-key')):
+        with patch("builtins.open", mock_open(read_data="openai-docker-key")):
             settings = Settings(
-                llm_provider="openai",
-                upload_dir=upload_dir,
-                chroma_db_path=chroma_dir
+                llm_provider="openai", upload_dir=upload_dir, chroma_db_path=chroma_dir
             )
 
             api_key = settings.get_api_key()
             assert api_key == "openai-docker-key"
 
             # OpenAI应该使用标准名称
-            mock_exists.assert_called_with("/run/secrets/openai_api_key/deepseek_api_key")
+            mock_exists.assert_called_with(
+                "/run/secrets/openai_api_key/deepseek_api_key"
+            )
 
-    @patch('keyring.get_password')
+    @patch("keyring.get_password")
     def test_get_api_key_from_keyring(self, mock_get_password, temp_dirs):
         """测试从系统keyring获取API key"""
         upload_dir, chroma_dir = temp_dirs
@@ -321,9 +321,7 @@ class TestSettings:
         mock_get_password.return_value = "keyring-api-key"
 
         settings = Settings(
-            llm_provider="deepseek",
-            upload_dir=upload_dir,
-            chroma_db_path=chroma_dir
+            llm_provider="deepseek", upload_dir=upload_dir, chroma_db_path=chroma_dir
         )
 
         api_key = settings.get_api_key()
@@ -332,8 +330,10 @@ class TestSettings:
         # 验证keyring被正确调用
         mock_get_password.assert_called_with("rag-kb", "deepseek_api_key")
 
-    @patch('keyring.get_password')
-    def test_get_api_key_from_keyring_fallback_to_openai(self, mock_get_password, temp_dirs):
+    @patch("keyring.get_password")
+    def test_get_api_key_from_keyring_fallback_to_openai(
+        self, mock_get_password, temp_dirs
+    ):
         """测试keyring回退到OpenAI配置"""
         upload_dir, chroma_dir = temp_dirs
 
@@ -341,9 +341,7 @@ class TestSettings:
         mock_get_password.side_effect = [None, "openai-keyring-key"]
 
         settings = Settings(
-            llm_provider="deepseek",
-            upload_dir=upload_dir,
-            chroma_db_path=chroma_dir
+            llm_provider="deepseek", upload_dir=upload_dir, chroma_db_path=chroma_dir
         )
 
         api_key = settings.get_api_key()
@@ -352,15 +350,12 @@ class TestSettings:
         # 验证两次调用
         assert mock_get_password.call_count == 2
 
-    @patch('keyring.get_password', side_effect=ImportError())
+    @patch("keyring.get_password", side_effect=ImportError())
     def test_get_api_key_keyring_not_available(self, mock_get_password, temp_dirs):
         """测试keyring不可用时的处理"""
         upload_dir, chroma_dir = temp_dirs
 
-        settings = Settings(
-            upload_dir=upload_dir,
-            chroma_db_path=chroma_dir
-        )
+        settings = Settings(upload_dir=upload_dir, chroma_db_path=chroma_dir)
 
         # 应该优雅处理ImportError（或其他异常）
         api_key = settings.get_api_key()
@@ -375,7 +370,7 @@ class TestSettings:
             llm_provider="openai",
             embedding_provider="openai",
             upload_dir=upload_dir,
-            chroma_db_path=chroma_dir
+            chroma_db_path=chroma_dir,
         )
 
         assert settings.get_embedding_api_key() == "test-key"
@@ -388,7 +383,7 @@ class TestSettings:
             embedding_provider="zhipu",
             zhipu_api_key="zhipu-key",
             upload_dir=upload_dir,
-            chroma_db_path=chroma_dir
+            chroma_db_path=chroma_dir,
         )
 
         assert settings.get_embedding_api_key() == "zhipu-key"
@@ -401,7 +396,7 @@ class TestSettings:
             llm_provider="openai",
             embedding_provider="openai",
             upload_dir=upload_dir,
-            chroma_db_path=chroma_dir
+            chroma_db_path=chroma_dir,
         )
 
         config = settings.get_model_config()
@@ -421,7 +416,7 @@ class TestSettings:
             llm_provider="deepseek",
             embedding_provider="openai",
             upload_dir=upload_dir,
-            chroma_db_path=chroma_dir
+            chroma_db_path=chroma_dir,
         )
 
         config = settings.get_model_config()
@@ -439,7 +434,7 @@ class TestSettings:
             llm_provider="zhipu",
             embedding_provider="zhipu",
             upload_dir=upload_dir,
-            chroma_db_path=chroma_dir
+            chroma_db_path=chroma_dir,
         )
 
         config = settings.get_model_config()
@@ -448,7 +443,9 @@ class TestSettings:
         assert config["chat_model"] == "glm-4"  # 应该自动替换默认值
         assert config["embedding_model"] == "embedding-3"  # 应该自动替换
         assert config["api_base_url"] == "https://open.bigmodel.cn/api/paas/v4"
-        assert config["embedding_api_base_url"] == "https://open.bigmodel.cn/api/paas/v4"
+        assert (
+            config["embedding_api_base_url"] == "https://open.bigmodel.cn/api/paas/v4"
+        )
 
     def test_get_model_config_custom_values(self, temp_dirs):
         """测试自定义模型配置值"""
@@ -459,7 +456,7 @@ class TestSettings:
             chat_model="custom-chat-model",
             api_base_url="https://custom.api.com",
             upload_dir=upload_dir,
-            chroma_db_path=chroma_dir
+            chroma_db_path=chroma_dir,
         )
 
         config = settings.get_model_config()
@@ -476,7 +473,7 @@ class TestSettings:
             llm_provider="deepseek",
             embedding_provider="openai",
             upload_dir=upload_dir,
-            chroma_db_path=chroma_dir
+            chroma_db_path=chroma_dir,
         )
 
         config = settings.get_model_config()
@@ -495,10 +492,7 @@ class TestSettings:
         assert not os.path.exists(chroma_dir)
 
         # 创建设置实例应该创建目录
-        settings = Settings(
-            upload_dir=upload_dir,
-            chroma_db_path=chroma_dir
-        )
+        settings = Settings(upload_dir=upload_dir, chroma_db_path=chroma_dir)
 
         assert os.path.exists(upload_dir)
         assert os.path.exists(chroma_dir)
@@ -517,7 +511,7 @@ class TestSettings:
             llm_temperature=0.2,
             llm_max_tokens=1200,
             upload_dir=upload_dir,
-            chroma_db_path=chroma_dir
+            chroma_db_path=chroma_dir,
         )
 
         assert settings.enable_embedding_cache is False
@@ -539,7 +533,7 @@ class TestSettings:
             max_sources=5,
             similarity_threshold=0.8,
             upload_dir=upload_dir,
-            chroma_db_path=chroma_dir
+            chroma_db_path=chroma_dir,
         )
 
         assert settings.chunk_size == 1500
@@ -557,7 +551,7 @@ class TestSettings:
             frontend_host="localhost",
             frontend_port=8502,
             upload_dir=upload_dir,
-            chroma_db_path=chroma_dir
+            chroma_db_path=chroma_dir,
         )
 
         assert settings.backend_host == "127.0.0.1"
@@ -574,7 +568,7 @@ class TestSettingsIntegration:
         upload_dir, chroma_dir = temp_dirs
 
         # 创建API key文件
-        with tempfile.NamedTemporaryFile(mode='w', delete=False) as key_file:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as key_file:
             key_file.write("integration-test-key")
             key_file_path = key_file.name
 
@@ -590,7 +584,7 @@ class TestSettingsIntegration:
                 max_sources=4,
                 enable_embedding_cache=True,
                 upload_dir=upload_dir,
-                chroma_db_path=chroma_dir
+                chroma_db_path=chroma_dir,
             )
 
             # 验证基本配置
@@ -625,23 +619,20 @@ class TestSettingsIntegration:
 
         # 模拟环境变量
         env_vars = {
-            'LLM_PROVIDER': 'zhipu',
-            'CHAT_MODEL': 'glm-4-test',
-            'CHUNK_SIZE': '2000',
-            'MAX_SOURCES': '5',
-            'DEBUG': 'false',
-            'ENABLE_API_DOCS': 'true'
+            "LLM_PROVIDER": "zhipu",
+            "CHAT_MODEL": "glm-4-test",
+            "CHUNK_SIZE": "2000",
+            "MAX_SOURCES": "5",
+            "DEBUG": "false",
+            "ENABLE_API_DOCS": "true",
         }
 
         with patch.dict(os.environ, env_vars):
-            settings = Settings(
-                upload_dir=upload_dir,
-                chroma_db_path=chroma_dir
-            )
+            settings = Settings(upload_dir=upload_dir, chroma_db_path=chroma_dir)
 
             # 验证环境变量被正确加载
-            assert settings.llm_provider == 'zhipu'
-            assert settings.chat_model == 'glm-4-test'
+            assert settings.llm_provider == "zhipu"
+            assert settings.chat_model == "glm-4-test"
             assert settings.chunk_size == 2000
             assert settings.max_sources == 5
             assert settings.debug is False
@@ -652,7 +643,7 @@ class TestSettingsIntegration:
         upload_dir, chroma_dir = temp_dirs
 
         # 创建API key文件
-        with tempfile.NamedTemporaryFile(mode='w', delete=False) as key_file:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as key_file:
             key_file.write("file-key")
             key_file_path = key_file.name
 
@@ -660,9 +651,9 @@ class TestSettingsIntegration:
             # 模拟环境变量
             base64_key = base64.b64encode(b"env-base64-key").decode()
             env_vars = {
-                'API_KEY': 'env-direct-key',  # 应该有最高优先级
-                'API_KEY_BASE64': base64_key,
-                'OPENAI_API_KEY': 'env-openai-key'
+                "API_KEY": "env-direct-key",  # 应该有最高优先级
+                "API_KEY_BASE64": base64_key,
+                "OPENAI_API_KEY": "env-openai-key",
             }
 
             with patch.dict(os.environ, env_vars):
@@ -670,7 +661,7 @@ class TestSettingsIntegration:
                     api_key_file=key_file_path,  # 文件key应该被忽略
                     openai_api_key="config-openai-key",  # 配置key应该被忽略
                     upload_dir=upload_dir,
-                    chroma_db_path=chroma_dir
+                    chroma_db_path=chroma_dir,
                 )
 
                 # 应该使用环境变量中的直接API key
@@ -679,7 +670,7 @@ class TestSettingsIntegration:
         finally:
             os.unlink(key_file_path)
 
-    @patch('keyring.get_password')
+    @patch("keyring.get_password")
     def test_keyring_integration(self, mock_get_password, temp_dirs):
         """测试keyring集成"""
         upload_dir, chroma_dir = temp_dirs
@@ -689,7 +680,7 @@ class TestSettingsIntegration:
             keyring_keys = {
                 ("rag-kb", "deepseek_api_key"): "keyring-deepseek-key",
                 ("rag-kb", "openai_api_key"): "keyring-openai-key",
-                ("rag-kb", "zhipu_api_key"): "keyring-zhipu-key"
+                ("rag-kb", "zhipu_api_key"): "keyring-zhipu-key",
             }
             return keyring_keys.get((service, username))
 
@@ -703,9 +694,7 @@ class TestSettingsIntegration:
 
         for provider, expected_key in providers_and_keys:
             settings = Settings(
-                llm_provider=provider,
-                upload_dir=upload_dir,
-                chroma_db_path=chroma_dir
+                llm_provider=provider, upload_dir=upload_dir, chroma_db_path=chroma_dir
             )
 
             api_key = settings.get_api_key()
@@ -726,21 +715,22 @@ class TestSettingsIntegration:
         # 记录真实 open 以便对非 secrets 文件走真实分支
         real_open = open
 
-        def mock_open_func(path, mode='r', **kwargs):
+        def mock_open_func(path, mode="r", **kwargs):
             p = str(path)
             if p in secrets_content:
                 return mock_open(read_data=secrets_content[p]).return_value
             # 其它文件（如 .env）走真实 open，避免 TypeError/编码问题
             return real_open(path, mode, **kwargs)
 
-        with patch('os.path.exists', side_effect=mock_exists), \
-             patch('builtins.open', side_effect=mock_open_func):
+        with patch("os.path.exists", side_effect=mock_exists), patch(
+            "builtins.open", side_effect=mock_open_func
+        ):
 
             # 测试DeepSeek Docker secret
             settings = Settings(
                 llm_provider="deepseek",
                 upload_dir=upload_dir,
-                chroma_db_path=chroma_dir
+                chroma_db_path=chroma_dir,
             )
 
             api_key = settings.get_api_key()

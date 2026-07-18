@@ -1,21 +1,21 @@
+import json
+import logging
+import os
 import threading
 import time
-import json
-import os
-from concurrent.futures import ThreadPoolExecutor, Future
-from typing import Dict, Any, Optional
+from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
-import logging
+from typing import Any, Dict, Optional
 
 from app.core.exceptions import CancellationError
 
 logger = logging.getLogger(__name__)
 
+
 class AsyncDocumentProcessor:
     def __init__(self, max_workers: int = 2):
         self.executor = ThreadPoolExecutor(
-            max_workers=max_workers,
-            thread_name_prefix="doc_processor"
+            max_workers=max_workers, thread_name_prefix="doc_processor"
         )
         self.tasks: Dict[str, Dict[str, Any]] = {}
         self._lock = threading.Lock()
@@ -25,7 +25,7 @@ class AsyncDocumentProcessor:
 
         # 启动清理线程
         self._start_cleanup_thread()
-    
+
     def submit_task(
         self,
         job_id: str,
@@ -41,8 +41,7 @@ class AsyncDocumentProcessor:
             self._cancel_flags[job_id] = cancel_event
 
         future = self.executor.submit(
-            self._process_document_safe,
-            job_id, file_path, filename, content_hash
+            self._process_document_safe, job_id, file_path, filename, content_hash
         )
 
         with self._lock:
@@ -52,12 +51,12 @@ class AsyncDocumentProcessor:
                 "content_hash": content_hash,
                 "submitted_at": time.time(),
                 "status": "queued",
-                "file_path": file_path  # 保存文件路径用于清理
+                "file_path": file_path,  # 保存文件路径用于清理
             }
 
         logger.info(f"Task submitted for file {filename} (job_id: {job_id})")
         return job_id
-    
+
     def cancel_task(self, job_id: str) -> Dict[str, Any]:
         """
         取消正在处理的任务
@@ -73,7 +72,7 @@ class AsyncDocumentProcessor:
             return {
                 "success": False,
                 "message": "任务不存在或已完成",
-                "status": "not_found"
+                "status": "not_found",
             }
 
         future = task_info["future"]
@@ -83,18 +82,19 @@ class AsyncDocumentProcessor:
             return {
                 "success": False,
                 "message": "任务已完成，无法取消",
-                "status": "already_done"
+                "status": "already_done",
             }
 
         # 设置取消标志
         if cancel_event:
             cancel_event.set()
             logger.info(f"Cancel flag set for document {job_id}")
-        
+
         # 立即更新状态为 cancelling，让 SSE 监控器知道任务正在取消
         from app.core.job_status import job_status
+
         job_status.update(job_id, status="cancelling", message="正在取消任务...")
-        
+
         # 尝试取消 Future（如果还在队列中未开始执行）
         cancelled = future.cancel()
 
@@ -105,12 +105,13 @@ class AsyncDocumentProcessor:
 
             # 更新任务状态
             from app.core.job_status import job_status
+
             job_status.mark_cancelled(job_id, filename=task_info.get("filename"))
 
             return {
                 "success": True,
                 "message": "任务已取消（未开始执行）",
-                "status": "cancelled"
+                "status": "cancelled",
             }
         else:
             # 任务已经在执行中，等待其检查取消标志
@@ -118,7 +119,7 @@ class AsyncDocumentProcessor:
             return {
                 "success": True,
                 "message": "取消请求已发送，任务将在下一个检查点停止",
-                "status": "cancelling"
+                "status": "cancelling",
             }
 
     def _check_cancelled(self, job_id: str) -> bool:
@@ -133,6 +134,7 @@ class AsyncDocumentProcessor:
         # 兜底：读取持久化 job_status，若为 cancelling/cancelled 也视为已取消
         try:
             from app.core.job_status import job_status
+
             js = job_status.get(job_id) or {}
             st = (js.get("status") or "").lower()
             if st in ("cancelling", "cancelled"):
@@ -182,7 +184,7 @@ class AsyncDocumentProcessor:
                     "job_id": job_id,
                     "document_id": None,
                     "error": str(future.exception()),
-                    "filename": task_info["filename"]
+                    "filename": task_info["filename"],
                 }
             else:
                 result = future.result()
@@ -194,7 +196,9 @@ class AsyncDocumentProcessor:
                     "job_id": job_id,
                     "filename": task_info["filename"],
                     "chunk_count": result.get("chunk_count", 0),
-                    "document_id": result.get("document_id") if result.get("success") else None,
+                    "document_id": (
+                        result.get("document_id") if result.get("success") else None
+                    ),
                     "error": result.get("error"),
                     "submitted_at": task_info["submitted_at"],
                 }
@@ -206,7 +210,7 @@ class AsyncDocumentProcessor:
                     "job_id": job_id,
                     "document_id": None,
                     "filename": task_info["filename"],
-                    "submitted_at": task_info["submitted_at"]
+                    "submitted_at": task_info["submitted_at"],
                 }
             return {
                 "status": "processing",
@@ -215,9 +219,9 @@ class AsyncDocumentProcessor:
                 "filename": task_info["filename"],
                 "document_id": None,
                 "error": None,
-                "submitted_at": task_info["submitted_at"]
+                "submitted_at": task_info["submitted_at"],
             }
-    
+
     def _process_document_safe(
         self,
         job_id: str,
@@ -228,8 +232,8 @@ class AsyncDocumentProcessor:
         """安全的文档处理包装器（支持取消）"""
         try:
             from app.core.document_processor import doc_processor
-            from app.core.vector_store import get_vector_store
             from app.core.job_status import job_status
+            from app.core.vector_store import get_vector_store
 
             logger.info(f"Starting processing for {filename}")
 
@@ -240,7 +244,11 @@ class AsyncDocumentProcessor:
                     task_info = self.tasks.get(job_id, {})
                 self._cleanup_task_files(job_id, task_info)
                 job_status.mark_cancelled(job_id, filename=filename)
-                return {"success": False, "error": "Task cancelled by user", "cancelled": True}
+                return {
+                    "success": False,
+                    "error": "Task cancelled by user",
+                    "cancelled": True,
+                }
 
             # 更新状态
             job_status.mark_processing(job_id, progress=10, message="开始处理文档")
@@ -252,7 +260,11 @@ class AsyncDocumentProcessor:
                     task_info = self.tasks.get(job_id, {})
                 self._cleanup_task_files(job_id, task_info)
                 job_status.mark_cancelled(job_id, filename=filename)
-                return {"success": False, "error": "Task cancelled by user", "cancelled": True}
+                return {
+                    "success": False,
+                    "error": "Task cancelled by user",
+                    "cancelled": True,
+                }
 
             # 移动文件到最终目录
             if doc_processor.is_in_temp_dir(file_path):
@@ -265,7 +277,9 @@ class AsyncDocumentProcessor:
                 if job_id in self.tasks:
                     self.tasks[job_id]["file_path"] = real_path
 
-            job_status.mark_processing(job_id, progress=20, message="文件准备完成", file_path=real_path)
+            job_status.mark_processing(
+                job_id, progress=20, message="文件准备完成", file_path=real_path
+            )
 
             # 检查点 3: 文档处理前检查
             if self._check_cancelled(job_id):
@@ -274,12 +288,18 @@ class AsyncDocumentProcessor:
                     task_info = self.tasks.get(job_id, {})
                 self._cleanup_task_files(job_id, task_info)
                 job_status.mark_cancelled(job_id, filename=filename)
-                return {"success": False, "error": "Task cancelled by user", "cancelled": True}
+                return {
+                    "success": False,
+                    "error": "Task cancelled by user",
+                    "cancelled": True,
+                }
 
             # 处理文档，传递取消检查函数
-            job_status.mark_processing(job_id, progress=30, message="正在解析文档内容...")
+            job_status.mark_processing(
+                job_id, progress=30, message="正在解析文档内容..."
+            )
             result = doc_processor.process_document(
-                real_path, 
+                real_path,
                 filename,
                 cancel_checker=lambda: self._check_cancelled(job_id),
                 content_hash=content_hash,
@@ -292,9 +312,13 @@ class AsyncDocumentProcessor:
                     task_info = self.tasks.get(job_id, {})
                 self._cleanup_task_files(job_id, task_info)
                 job_status.mark_cancelled(job_id, filename=filename)
-                return {"success": False, "error": "Task cancelled by user", "cancelled": True}
+                return {
+                    "success": False,
+                    "error": "Task cancelled by user",
+                    "cancelled": True,
+                }
 
-            if result['status'] == 'completed':
+            if result["status"] == "completed":
                 # 检查点 5: 向量化前检查
                 if self._check_cancelled(job_id):
                     logger.info(f"Task cancelled before vectorization: {job_id}")
@@ -302,12 +326,16 @@ class AsyncDocumentProcessor:
                         task_info = self.tasks.get(job_id, {})
                     self._cleanup_task_files(job_id, task_info)
                     job_status.mark_cancelled(job_id, filename=filename)
-                    return {"success": False, "error": "Task cancelled by user", "cancelled": True}
+                    return {
+                        "success": False,
+                        "error": "Task cancelled by user",
+                        "cancelled": True,
+                    }
 
                 # 添加到向量存储
-                chunks = result.get('chunks', [])
+                chunks = result.get("chunks", [])
                 for chunk in chunks:
-                    chunk.metadata['job_id'] = job_id
+                    chunk.metadata["job_id"] = job_id
 
                 job_status.mark_processing(job_id, progress=80, message="生成向量嵌入")
                 get_vector_store().add_documents(chunks)
@@ -319,15 +347,21 @@ class AsyncDocumentProcessor:
                     try:
                         get_vector_store().delete_by_metadata("job_id", job_id)
                     except Exception as ve:
-                        logger.error(f"Failed to delete vectors for cancelled task: {ve}")
+                        logger.error(
+                            f"Failed to delete vectors for cancelled task: {ve}"
+                        )
 
                     with self._lock:
                         task_info = self.tasks.get(job_id, {})
                     self._cleanup_task_files(job_id, task_info)
                     job_status.mark_cancelled(job_id, filename=filename)
-                    return {"success": False, "error": "Task cancelled by user", "cancelled": True}
+                    return {
+                        "success": False,
+                        "error": "Task cancelled by user",
+                        "cancelled": True,
+                    }
 
-                real_document_id = result.get('document_id')
+                real_document_id = result.get("document_id")
                 # 标记完成
                 job_status.mark_completed(
                     job_id,
@@ -344,27 +378,46 @@ class AsyncDocumentProcessor:
                     "document_id": real_document_id,
                 }
             else:
-                error_msg = result.get('error_message', 'Unknown processing error')
+                error_msg = result.get("error_message", "Unknown processing error")
                 job_status.mark_failed(job_id, error=error_msg, filename=filename)
-                return {"success": False, "job_id": job_id, "document_id": None, "error": error_msg}
+                return {
+                    "success": False,
+                    "job_id": job_id,
+                    "document_id": None,
+                    "error": error_msg,
+                }
 
         except CancellationError as e:
             # 处理取消异常
             logger.info(f"Document processing cancelled for {filename}: {str(e)}")
             from app.core.job_status import job_status
+
             with self._lock:
                 task_info = self.tasks.get(job_id, {})
             self._cleanup_task_files(job_id, task_info)
             job_status.mark_cancelled(job_id, filename=filename)
-            return {"success": False, "job_id": job_id, "document_id": None, "error": str(e), "cancelled": True}
+            return {
+                "success": False,
+                "job_id": job_id,
+                "document_id": None,
+                "error": str(e),
+                "cancelled": True,
+            }
         except Exception as e:
             logger.error(f"Document processing failed for {filename}: {str(e)}")
             from app.core.job_status import job_status
+
             job_status.mark_failed(job_id, error=str(e), filename=filename)
-            return {"success": False, "job_id": job_id, "document_id": None, "error": str(e)}
-    
+            return {
+                "success": False,
+                "job_id": job_id,
+                "document_id": None,
+                "error": str(e),
+            }
+
     def _start_cleanup_thread(self):
         """启动清理线程，定期清理完成的任务"""
+
         def cleanup_worker():
             while True:
                 try:
@@ -373,23 +426,26 @@ class AsyncDocumentProcessor:
                         # 清理1小时前完成的任务
                         to_remove = []
                         for doc_id, task_info in self.tasks.items():
-                            if (task_info["future"].done() and 
-                                current_time - task_info["submitted_at"] > 3600):
+                            if (
+                                task_info["future"].done()
+                                and current_time - task_info["submitted_at"] > 3600
+                            ):
                                 to_remove.append(doc_id)
-                        
+
                         for doc_id in to_remove:
                             del self.tasks[doc_id]
-                            
+
                     if to_remove:
                         logger.info(f"Cleaned up {len(to_remove)} completed tasks")
-                        
+
                 except Exception as e:
                     logger.error(f"Cleanup thread error: {e}")
-                
+
                 time.sleep(300)  # 5分钟清理一次
-        
+
         cleanup_thread = threading.Thread(target=cleanup_worker, daemon=True)
         cleanup_thread.start()
+
 
 # 全局单例
 async_processor = AsyncDocumentProcessor(max_workers=2)

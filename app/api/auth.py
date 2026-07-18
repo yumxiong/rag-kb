@@ -2,23 +2,20 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 import jwt
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import OAuth2PasswordBearer
-from fastapi.security import OAuth2PasswordRequestForm
-from fastapi import Request
-
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jwt import ExpiredSignatureError, InvalidTokenError
-from pydantic import BaseModel
 from pwdlib import PasswordHash
+from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.rate_limiter import limiter
-
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 ph = PasswordHash.recommended()
 logger = logging.getLogger(__name__)
+
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -30,7 +27,9 @@ def require_admin(token: str = Depends(oauth2_scheme)) -> dict:
         secret = settings.get_jwt_secret()
     except RuntimeError as exc:
         logger.error(f"Admin auth misconfigured: {exc}")
-        raise HTTPException(status_code=500, detail="Admin authentication is not configured")
+        raise HTTPException(
+            status_code=500, detail="Admin authentication is not configured"
+        )
 
     try:
         claims = jwt.decode(
@@ -58,7 +57,9 @@ async def login(request: Request, form: OAuth2PasswordRequestForm = Depends()):
         secret = settings.get_jwt_secret()
     except RuntimeError as exc:
         logger.error(f"Admin auth misconfigured: {exc}")
-        raise HTTPException(status_code=500, detail="Admin authentication is not configured")
+        raise HTTPException(
+            status_code=500, detail="Admin authentication is not configured"
+        )
 
     if form.username != settings.admin_username:
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -67,7 +68,9 @@ async def login(request: Request, form: OAuth2PasswordRequestForm = Depends()):
         password_ok = ph.verify(form.password, password_hash)
     except Exception:
         logger.error("Invalid admin password hash format")
-        raise HTTPException(status_code=500, detail="Admin authentication is not configured")
+        raise HTTPException(
+            status_code=500, detail="Admin authentication is not configured"
+        )
 
     if not password_ok:
         raise HTTPException(status_code=401, detail="Invalid credentials")

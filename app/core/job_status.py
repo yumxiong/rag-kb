@@ -3,12 +3,13 @@
 - 将每个异步处理任务（job_id 对应的作业）以 JSON 文件存储在 settings.job_status_dir
 - 提供 init / update / mark_completed / mark_failed / get 等基础方法
 """
+
 import json
+import logging
 import os
 import threading
 from datetime import datetime
-from typing import Optional, Dict, Any
-import logging
+from typing import Any, Dict, Optional
 
 from app.core.config import settings
 
@@ -22,13 +23,15 @@ class JobStatusManager:
         self._lock = threading.Lock()
 
     def _path(self, job_id: str) -> str:
-        safe_id = ''.join(c for c in job_id if c.isalnum() or c in ('-', '_'))
+        safe_id = "".join(c for c in job_id if c.isalnum() or c in ("-", "_"))
         return os.path.join(self.base_dir, f"{safe_id}.json")
 
     def _now(self) -> str:
         return datetime.now().isoformat()
 
-    def init_job(self, job_id: str, filename: str, extra: Optional[Dict[str, Any]] = None):
+    def init_job(
+        self, job_id: str, filename: str, extra: Optional[Dict[str, Any]] = None
+    ):
         data = {
             "job_id": job_id,
             "document_id": None,
@@ -49,7 +52,13 @@ class JobStatusManager:
         data["last_updated"] = self._now()
         self._write(job_id, data)
 
-    def mark_processing(self, job_id: str, progress: Optional[int] = None, message: Optional[str] = None, **kwargs):
+    def mark_processing(
+        self,
+        job_id: str,
+        progress: Optional[int] = None,
+        message: Optional[str] = None,
+        **kwargs,
+    ):
         payload = {"status": "processing"}
         if progress is not None:
             payload["progress"] = int(max(0, min(99, progress)))
