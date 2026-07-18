@@ -29,6 +29,7 @@ data/quotas/*
 !data/uploads/.gitkeep
 !data/chroma_db/.gitkeep
 !data/job_status/.gitkeep
+data/eval_docs/*
 
 # IDE
 .vscode/
@@ -37,6 +38,11 @@ data/quotas/*
 *.swo
 .windsurf/
 .augment/
+.cursor/
+.qoder/
+.claude/
+
+
 # OS
 .DS_Store
 Thumbs.db
