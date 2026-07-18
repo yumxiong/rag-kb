@@ -1,21 +1,24 @@
 """
 配置管理模块
 """
-import os
-import json
-import base64
-from typing import Optional, Dict, Any
-from pydantic_settings import BaseSettings, SettingsConfigDict
-import logging
-from fastapi import HTTPException
-from app.core.url_safety import is_safe_base_url
 
+import base64
+import json
+import logging
+import os
+from typing import Any, Dict, Optional
+
+from fastapi import HTTPException
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from app.core.url_safety import is_safe_base_url
 
 logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
     """应用配置类"""
+
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
     # 应用基本配置
     app_name: str = "RAG Knowledge Base"
@@ -29,14 +32,16 @@ class Settings(BaseSettings):
     embedding_provider: str = "openai"  # 嵌入模型提供商，可以与LLM提供商不同
 
     # Base URL配置
-    allowed_chat_base_urls: str = ("https://api.openai.com/v1,https://api.deepseek.com,"
-  "https://open.bigmodel.cn/api/paas/v4,https://openrouter.ai/api/v1")
-    
+    allowed_chat_base_urls: str = (
+        "https://api.openai.com/v1,https://api.deepseek.com,"
+        "https://open.bigmodel.cn/api/paas/v4,https://openrouter.ai/api/v1"
+    )
+
     # API配置 - 支持多种获取方式
     api_key: Optional[str] = None
     api_key_file: Optional[str] = None
     api_key_base64: Optional[str] = None
-    
+
     # 智谱AI配置
     zhipu_api_key: Optional[str] = None
 
@@ -64,18 +69,22 @@ class Settings(BaseSettings):
     # 作业状态目录（用于持久化处理进度/错误）
     job_status_dir: str = "./data/job_status"
     max_file_size_mb: int = 50  # 最大文件上传大小（MB）
-    
+
     # 服务器配置
     backend_host: str = "127.0.0.1"
     backend_port: int = 8000
     frontend_host: str = "127.0.0.1"
     frontend_port: int = 8501
-    
+
     # CORS配置
-    allowed_origins: str = "http://localhost:8501,http://127.0.0.1:8501"  # 允许的前端域名，逗号分隔
+    allowed_origins: str = (
+        "http://localhost:8501,http://127.0.0.1:8501"  # 允许的前端域名，逗号分隔
+    )
     allowed_methods: str = "GET,POST,DELETE"  # 允许的HTTP方法
-    allowed_headers: str = "Content-Type,Authorization,LLM-API-Key,LLM-Provider,LLM-Base-URL,LLM-Model,Cache-Control,Connection"  # 允许的请求头（含BYOK和SSE）
-    
+    allowed_headers: str = (
+        "Content-Type,Authorization,LLM-API-Key,LLM-Provider,LLM-Base-URL,LLM-Model,Cache-Control,Connection"  # 允许的请求头（含BYOK和SSE）
+    )
+
     # RAG配置
     chunk_size: int = 1000
     chunk_overlap: int = 200
@@ -90,10 +99,14 @@ class Settings(BaseSettings):
     retrieval_mmr_lambda_mult: float = 0.5
 
     similarity_threshold: float = 1.5  # ChromaDB距离分数,值越小越相似,1.5以下通常为相关
-        
+
     # 回退/过滤相关
-    relevance_fallback_threshold: float = 0.5  # 更严格的相似度阈值（距离<=该值视为强相关），无强相关则回退到全库
-    relevance_fallback_margin: float = 0.1     # 当全库最佳结果优于限定范围最佳结果超过该边际时触发回退
+    relevance_fallback_threshold: float = (
+        0.5  # 更严格的相似度阈值（距离<=该值视为强相关），无强相关则回退到全库
+    )
+    relevance_fallback_margin: float = (
+        0.1  # 当全库最佳结果优于限定范围最佳结果超过该边际时触发回退
+    )
     # 输入限制设置
     max_question_length: int = 2000
     min_question_length: int = 1
@@ -102,22 +115,22 @@ class Settings(BaseSettings):
     enable_qa_cache: bool = True
     embedding_cache_ttl_days: int = 7  # 嵌入缓存过期时间（天）
     qa_cache_ttl_hours: int = 24  # 问答缓存过期时间（小时）
-    
+
     # 智能批处理配置
     embedding_batch_size: int = 100  # 嵌入批处理大小
-    max_context_length: int = 4000   # 最大上下文长度（tokens）
-    
+    max_context_length: int = 4000  # 最大上下文长度（tokens）
+
     # LLM优化配置
-    llm_temperature: float = 0.1     # 降低随机性提高缓存命中
-    llm_max_tokens: int = 800        # 减少生成token数
-    
+    llm_temperature: float = 0.1  # 降低随机性提高缓存命中
+    llm_max_tokens: int = 800  # 减少生成token数
+
     # 并发保护配置
-    max_concurrent_llm_requests: int = 5   # LLM 调用最大并发数
-    max_concurrent_requests: int = 20      # 全局最大并发请求数
+    max_concurrent_llm_requests: int = 5  # LLM 调用最大并发数
+    max_concurrent_requests: int = 20  # 全局最大并发请求数
 
     # 配额限制配置
     enable_quota_limit: bool = True  # 是否启用配额限制
-    default_daily_quota: int = 5     # 默认每日配额（未提供自定义API Key的用户）
+    default_daily_quota: int = 5  # 默认每日配额（未提供自定义API Key的用户）
     quota_storage_path: str = "./data/quotas"  # 配额数据存储路径
 
     # jwt认证相关
@@ -128,10 +141,10 @@ class Settings(BaseSettings):
 
     # 管理员密钥配置
     admin_username: str = "admin"
-    admin_password_hash: str | None = None  
+    admin_password_hash: str | None = None
     admin_password_hash_file: str | None = None
     admin_password_hash_base64: str | None = None
-               
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # 确保目录存在
@@ -141,69 +154,71 @@ class Settings(BaseSettings):
         try:
             os.makedirs(self.temp_upload_dir, exist_ok=True)
         except Exception as e:
-            logger.warning(f"Failed to create temp upload dir {self.temp_upload_dir}: {e}")
+            logger.warning(
+                f"Failed to create temp upload dir {self.temp_upload_dir}: {e}"
+            )
         # 确保作业状态目录存在
         try:
             os.makedirs(self.job_status_dir, exist_ok=True)
         except Exception as e:
-            logger.warning(f"Failed to create job status dir {self.job_status_dir}: {e}")
-    
+            logger.warning(
+                f"Failed to create job status dir {self.job_status_dir}: {e}"
+            )
 
-
-   
     def get_allowed_chat_base_urls(self) -> list[str]:
         """获取允许的聊天模型API端点列表"""
-        return [url.strip() for url in self.allowed_chat_base_urls.split(",") if url.strip()]
-    
-    
-   
+        return [
+            url.strip() for url in self.allowed_chat_base_urls.split(",") if url.strip()
+        ]
+
     def get_api_key(self) -> Optional[str]:
         """安全地获取API Key（支持多种提供商）"""
         # 方式1: 新的通用API key配置
         if self.api_key:
             return self.api_key
-        
+
         # 方式2: 从文件读取
         if self.api_key_file:
             try:
-                with open(self.api_key_file, 'r') as f:
+                with open(self.api_key_file, "r") as f:
                     key = f.read().strip()
                     if key:
                         return key
             except Exception as e:
                 logger.warning(f"Failed to read API key from configured file")
 
-        
         # 方式3: 从base64编码的环境变量
         if self.api_key_base64:
             try:
-                key = base64.b64decode(self.api_key_base64).decode('utf-8').strip()
+                key = base64.b64decode(self.api_key_base64).decode("utf-8").strip()
                 if key:
                     return key
             except Exception as e:
                 logger.warning(f"Failed to decode base64 API key")
-        
+
         # 向后兼容：方式4: 检查OpenAI特定配置
         if self.openai_api_key:
             return self.openai_api_key
-        
+
         if self.openai_api_key_file:
             try:
-                with open(self.openai_api_key_file, 'r') as f:
+                with open(self.openai_api_key_file, "r") as f:
                     key = f.read().strip()
                     if key:
                         return key
             except Exception as e:
                 logger.warning(f"Failed to read OpenAI API key from configured file")
-        
+
         if self.openai_api_key_base64:
             try:
-                key = base64.b64decode(self.openai_api_key_base64).decode('utf-8').strip()
+                key = (
+                    base64.b64decode(self.openai_api_key_base64).decode("utf-8").strip()
+                )
                 if key:
                     return key
             except Exception as e:
                 logger.warning(f"Failed to decode configured OpenAI API key")
-        
+
         # 方式5: 从Docker secrets
         if self.llm_provider in {"openai", "deepseek"}:
             docker_secret_path = "/run/secrets/openai_api_key/deepseek_api_key"
@@ -212,16 +227,17 @@ class Settings(BaseSettings):
             docker_secret_path = f"/run/secrets/{secret_name}"
         if os.path.exists(docker_secret_path):
             try:
-                with open(docker_secret_path, 'r') as f:
+                with open(docker_secret_path, "r") as f:
                     key = f.read().strip()
                     if key:
                         return key
             except Exception as e:
                 logger.warning(f"Failed to read API key from Docker secret")
-        
+
         # 方式6: 从系统密钥环 (仅Linux/Mac)
         try:
             import keyring
+
             key = keyring.get_password("rag-kb", f"{self.llm_provider}_api_key")
             if not key and self.llm_provider != "openai":
                 # 回退到openai密钥环配置
@@ -232,14 +248,14 @@ class Settings(BaseSettings):
             pass
         except Exception as e:
             logger.warning(f"Failed to get API key from system keyring")
-        
+
         logger.warning(f"No valid API key configured")
         return None
-    
+
     def get_openai_api_key(self) -> Optional[str]:
         """向后兼容：获取OpenAI API Key"""
         return self.get_api_key()
-    
+
     def _read_secret_from_sources(
         self,
         *,
@@ -260,13 +276,17 @@ class Settings(BaseSettings):
                         logger.info(f"{secret_name} loaded from file: {file_path}")
                         return value
             except Exception as e:
-                logger.warning(f"Failed to read {secret_name} from file {file_path}: {e}")
+                logger.warning(
+                    f"Failed to read {secret_name} from file {file_path}: {e}"
+                )
 
         if base64_value:
             try:
                 value = base64.b64decode(base64_value).decode("utf-8").strip()
                 if value:
-                    logger.info(f"{secret_name} loaded from base64 environment variable")
+                    logger.info(
+                        f"{secret_name} loaded from base64 environment variable"
+                    )
                     return value
             except Exception as e:
                 logger.warning(f"Failed to decode base64 {secret_name}: {e}")
@@ -304,7 +324,7 @@ class Settings(BaseSettings):
             )
 
         return password_hash
-    
+
     def get_embedding_api_key(self) -> Optional[str]:
         """获取嵌入模型的API Key（优先使用专用配置，其次按提供商回退，最后复用通用API Key）"""
         # 1) 专用嵌入 Key
@@ -313,7 +333,7 @@ class Settings(BaseSettings):
         # 2) 从文件读取
         if self.embedding_api_key_file:
             try:
-                with open(self.embedding_api_key_file, 'r') as f:
+                with open(self.embedding_api_key_file, "r") as f:
                     key = f.read().strip()
                     if key:
                         return key
@@ -322,7 +342,11 @@ class Settings(BaseSettings):
         # 3) 从base64
         if self.embedding_api_key_base64:
             try:
-                key = base64.b64decode(self.embedding_api_key_base64).decode('utf-8').strip()
+                key = (
+                    base64.b64decode(self.embedding_api_key_base64)
+                    .decode("utf-8")
+                    .strip()
+                )
                 if key:
                     return key
             except Exception as e:
@@ -337,40 +361,40 @@ class Settings(BaseSettings):
         """根据API Key格式自动检测提供商"""
         if not api_key:
             return self.llm_provider
-        
+
         api_key = api_key.strip()
-        
+
         # Zhipu API keys have the format: xxxxxxxx.xxxxxxxxxxxxxx (32 char hex + . + 16 chars)
         # Check this first since it has a unique format
         if "." in api_key and len(api_key.split(".")) == 2:
             parts = api_key.split(".")
             if len(parts[0]) == 32 and len(parts[1]) == 16:
                 return "zhipu"
-        
+
         # OpenAI API keys start with "sk-" and are longer (51-55 chars typically)
         if api_key.startswith("sk-") and len(api_key) >= 48:
             return "openai"
-        
+
         # DeepSeek API keys start with "sk-" and are shorter than OpenAI keys
         if api_key.startswith("sk-") and len(api_key) <= 47:
             return "deepseek"
-        
+
         # Default to current provider if pattern doesn't match
         return self.llm_provider
 
     def get_model_config(self, overrides: Optional[dict] = None) -> Dict[str, Any]:
         """获取当前模型配置，支持按请求覆盖"""
         overrides = overrides or {}
-        
+
         config = {
             "provider": self.llm_provider,
             "embedding_provider": self.embedding_provider,
             "chat_model": self.chat_model,
             "embedding_model": self.embedding_model,
             "api_base_url": self.api_base_url,
-            "embedding_api_base_url": self.embedding_api_base_url
+            "embedding_api_base_url": self.embedding_api_base_url,
         }
-        
+
         # 应用覆盖项
         if overrides.get("provider"):
             config["provider"] = overrides["provider"]
@@ -378,10 +402,10 @@ class Settings(BaseSettings):
             url = overrides["api_base_url"]
             if not is_safe_base_url(url, self.get_allowed_chat_base_urls()):
                 raise HTTPException(status_code=400, detail="LLM-Base-URL 不安全")
-            config["api_base_url"] = url    
+            config["api_base_url"] = url
         if overrides.get("model"):
             config["chat_model"] = overrides["model"]
-            
+
         # 如果提供了API key但没有明确指定provider，尝试自动检测
         auto_detected = False
         if overrides.get("api_key") and not overrides.get("provider"):
@@ -389,37 +413,49 @@ class Settings(BaseSettings):
             config["provider"] = detected_provider
             auto_detected = True
             if detected_provider != self.llm_provider:
-                logger.info(f"Auto-detected provider '{detected_provider}' based on API key format")
-        
+                logger.info(
+                    f"Auto-detected provider '{detected_provider}' based on API key format"
+                )
+
         # 根据不同提供商设置默认值
         # 如果provider被覆盖/自动检测且没有明确指定base_url，则使用provider对应的默认URL
-        provider_changed = (overrides.get("provider") and overrides["provider"] != self.llm_provider) or auto_detected
-        
+        provider_changed = (
+            overrides.get("provider") and overrides["provider"] != self.llm_provider
+        ) or auto_detected
+
         if config["provider"] == "deepseek":
             # 当provider变更或自动检测为DeepSeek时，如果没有明确指定URL，使用DeepSeek的URL
-            if not overrides.get("api_base_url") and (provider_changed or auto_detected):
+            if not overrides.get("api_base_url") and (
+                provider_changed or auto_detected
+            ):
                 config["api_base_url"] = "https://api.deepseek.com"
             elif not overrides.get("api_base_url") and not config["api_base_url"]:
                 config["api_base_url"] = "https://api.deepseek.com"
             if config["chat_model"] == "gpt-3.5-turbo":  # 如果还是默认值
                 config["chat_model"] = "deepseek-v4-flash"
         elif config["provider"] == "zhipu":
-            if not overrides.get("api_base_url") and (provider_changed or auto_detected):
+            if not overrides.get("api_base_url") and (
+                provider_changed or auto_detected
+            ):
                 config["api_base_url"] = "https://open.bigmodel.cn/api/paas/v4"
             elif not overrides.get("api_base_url") and not config["api_base_url"]:
                 config["api_base_url"] = "https://open.bigmodel.cn/api/paas/v4"
             if config["chat_model"] == "gpt-3.5-turbo":
                 config["chat_model"] = "glm-4"
         elif config["provider"] == "openai":
-            if not overrides.get("api_base_url") and (provider_changed or auto_detected):
+            if not overrides.get("api_base_url") and (
+                provider_changed or auto_detected
+            ):
                 config["api_base_url"] = "https://api.openai.com/v1"
             elif not overrides.get("api_base_url") and not config["api_base_url"]:
                 config["api_base_url"] = "https://api.openai.com/v1"
-        
+
         # 嵌入模型配置
         if self.embedding_provider == "zhipu":
             if not config["embedding_api_base_url"]:
-                config["embedding_api_base_url"] = "https://open.bigmodel.cn/api/paas/v4"
+                config["embedding_api_base_url"] = (
+                    "https://open.bigmodel.cn/api/paas/v4"
+                )
             if self.embedding_model == "text-embedding-ada-002":
                 config["embedding_model"] = "embedding-3"
         elif self.embedding_provider == "openai":
@@ -428,7 +464,9 @@ class Settings(BaseSettings):
         elif self.embedding_provider == "qwen":
             # Ali Qwen (DashScope) OpenAI-compatible endpoint
             if not config["embedding_api_base_url"]:
-                config["embedding_api_base_url"] = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+                config["embedding_api_base_url"] = (
+                    "https://dashscope.aliyuncs.com/compatible-mode/v1"
+                )
             # 若仍是默认OpenAI旧值，替换为Qwen的默认嵌入模型
             if self.embedding_model == "text-embedding-ada-002":
                 config["embedding_model"] = "text-embedding-v3"
@@ -439,19 +477,31 @@ class Settings(BaseSettings):
         """获取CORS允许的源域名列表"""
         if self.allowed_origins == "*":
             return ["*"]
-        return [origin.strip() for origin in self.allowed_origins.split(",") if origin.strip()]
-    
+        return [
+            origin.strip()
+            for origin in self.allowed_origins.split(",")
+            if origin.strip()
+        ]
+
     def get_cors_methods(self) -> list:
         """获取CORS允许的HTTP方法列表"""
         if self.allowed_methods == "*":
             return ["*"]
-        return [method.strip() for method in self.allowed_methods.split(",") if method.strip()]
-    
+        return [
+            method.strip()
+            for method in self.allowed_methods.split(",")
+            if method.strip()
+        ]
+
     def get_cors_headers(self) -> list:
         """获取CORS允许的请求头列表"""
         if self.allowed_headers == "*":
             return ["*"]
-        return [header.strip() for header in self.allowed_headers.split(",") if header.strip()]
+        return [
+            header.strip()
+            for header in self.allowed_headers.split(",")
+            if header.strip()
+        ]
 
 
 # 全局配置实例

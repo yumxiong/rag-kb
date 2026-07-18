@@ -1,8 +1,10 @@
 """
 QA Engine 模块单元测试
 """
+
+from unittest.mock import MagicMock, Mock, patch
+
 import pytest
-from unittest.mock import Mock, MagicMock, patch
 from langchain_core.documents import Document
 
 from app.core.qa_engine import QAEngine
@@ -20,12 +22,20 @@ class TestQAEngine:
         vector_store.similarity_search.return_value = [
             Document(
                 page_content="这是测试内容1",
-                metadata={"filename": "test1.txt", "document_id": "doc1", "chunk_index": 0}
+                metadata={
+                    "filename": "test1.txt",
+                    "document_id": "doc1",
+                    "chunk_index": 0,
+                },
             ),
             Document(
                 page_content="这是测试内容2",
-                metadata={"filename": "test2.txt", "document_id": "doc2", "chunk_index": 1}
-            )
+                metadata={
+                    "filename": "test2.txt",
+                    "document_id": "doc2",
+                    "chunk_index": 1,
+                },
+            ),
         ]
         vector_store.health_check.return_value = {"status": "healthy"}
         vector_store.get_collection_info.return_value = {"document_count": 5}
@@ -36,9 +46,11 @@ class TestQAEngine:
         """创建QA Engine实例（使用 yield 确保补丁在整个用例期间有效）"""
 
         # 模拟LLM初始化
-        with patch('app.core.qa_engine.settings') as mock_settings, \
-             patch('app.core.qa_engine.ChatOpenAI') as mock_chat_openai, \
-             patch('app.core.qa_engine.RetrievalQA') as mock_retrieval_qa:
+        with patch("app.core.qa_engine.settings") as mock_settings, patch(
+            "app.core.qa_engine.ChatOpenAI"
+        ) as mock_chat_openai, patch(
+            "app.core.qa_engine.RetrievalQA"
+        ) as mock_retrieval_qa:
 
             mock_llm = Mock()
             mock_llm.predict.return_value = "Test response"
@@ -53,7 +65,7 @@ class TestQAEngine:
             mock_settings.get_model_config.return_value = {
                 "provider": "openai",
                 "chat_model": "gpt-3.5-turbo",
-                "api_base_url": "https://api.openai.com/v1"
+                "api_base_url": "https://api.openai.com/v1",
             }
 
             engine = QAEngine(mock_vector_store)
@@ -62,26 +74,27 @@ class TestQAEngine:
 
     def test_initialize_llm_success(self, mock_vector_store):
         """测试LLM初始化成功"""
-        with patch('app.core.qa_engine.settings') as mock_settings, \
-             patch('app.core.qa_engine.ChatOpenAI') as mock_chat_openai:
+        with patch("app.core.qa_engine.settings") as mock_settings, patch(
+            "app.core.qa_engine.ChatOpenAI"
+        ) as mock_chat_openai:
 
             mock_settings.get_api_key.return_value = "test-key"
             mock_settings.get_model_config.return_value = {
                 "provider": "openai",
                 "chat_model": "gpt-3.5-turbo",
-                "api_base_url": "https://api.openai.com/v1"
+                "api_base_url": "https://api.openai.com/v1",
             }
 
             mock_llm = Mock()
             mock_chat_openai.return_value = mock_llm
 
-            with patch('app.core.qa_engine.RetrievalQA'):
+            with patch("app.core.qa_engine.RetrievalQA"):
                 engine = QAEngine(mock_vector_store)
                 assert engine.llm == mock_llm
 
     def test_initialize_llm_no_api_key(self, mock_vector_store):
         """测试没有API key时的错误处理"""
-        with patch('app.core.qa_engine.settings') as mock_settings:
+        with patch("app.core.qa_engine.settings") as mock_settings:
             mock_settings.get_api_key.return_value = None
             mock_settings.llm_provider = "openai"
 
@@ -90,17 +103,18 @@ class TestQAEngine:
 
     def test_initialize_llm_with_custom_base_url(self, mock_vector_store):
         """测试自定义API端点初始化"""
-        with patch('app.core.qa_engine.settings') as mock_settings, \
-             patch('app.core.qa_engine.ChatOpenAI') as mock_chat_openai:
+        with patch("app.core.qa_engine.settings") as mock_settings, patch(
+            "app.core.qa_engine.ChatOpenAI"
+        ) as mock_chat_openai:
 
             mock_settings.get_api_key.return_value = "test-key"
             mock_settings.get_model_config.return_value = {
                 "provider": "deepseek",
                 "chat_model": "deepseek-chat",
-                "api_base_url": "https://api.deepseek.com/v1"
+                "api_base_url": "https://api.deepseek.com/v1",
             }
 
-            with patch('app.core.qa_engine.RetrievalQA'):
+            with patch("app.core.qa_engine.RetrievalQA"):
                 engine = QAEngine(mock_vector_store)
 
                 # 验证ChatOpenAI被正确调用
@@ -109,14 +123,20 @@ class TestQAEngine:
                 assert call_kwargs["base_url"] == "https://api.deepseek.com/v1"
                 assert call_kwargs["organization"] == ""
 
-    @patch('app.core.qa_engine.cache_manager')
+    @patch("app.core.qa_engine.cache_manager")
     def test_ask_with_cache_hit(self, mock_cache_manager, qa_engine):
         """测试缓存命中的情况"""
         # 模拟缓存命中
         mock_cache_manager.get_context_hash.return_value = "test_hash"
         mock_cache_manager.get_qa_cache.return_value = {
             "answer": "缓存的答案",
-            "sources": [{"document_name": "test.txt", "content": "内容", "similarity_score": 0.9}]
+            "sources": [
+                {
+                    "document_name": "test.txt",
+                    "content": "内容",
+                    "similarity_score": 0.9,
+                }
+            ],
         }
 
         response = qa_engine.ask("测试问题")
@@ -126,7 +146,7 @@ class TestQAEngine:
         assert response.from_cache is True
         assert len(response.sources) == 1
 
-    @patch('app.core.qa_engine.cache_manager')
+    @patch("app.core.qa_engine.cache_manager")
     def test_ask_with_cache_miss(self, mock_cache_manager, qa_engine):
         """测试缓存未命中的情况"""
         # 模拟缓存未命中
@@ -139,9 +159,9 @@ class TestQAEngine:
             "source_documents": [
                 Document(
                     page_content="测试内容",
-                    metadata={"filename": "test.txt", "document_id": "doc1"}
+                    metadata={"filename": "test.txt", "document_id": "doc1"},
                 )
-            ]
+            ],
         }
 
         response = qa_engine.ask("测试问题")
@@ -159,7 +179,10 @@ class TestQAEngine:
         response = qa_engine.ask("  ")
 
         assert isinstance(response, QuestionResponse)
-        assert "问题不能为空" in response.answer or "Question cannot be empty" in response.answer
+        assert (
+            "问题不能为空" in response.answer
+            or "Question cannot be empty" in response.answer
+        )
         assert len(response.sources) == 0
 
     def test_ask_with_error(self, qa_engine):
@@ -167,7 +190,7 @@ class TestQAEngine:
         # 模拟QA chain抛出异常
         qa_engine.qa_chain.side_effect = Exception("测试错误")
 
-        with patch('app.core.qa_engine.cache_manager') as mock_cache_manager:
+        with patch("app.core.qa_engine.cache_manager") as mock_cache_manager:
             mock_cache_manager.get_context_hash.return_value = "test_hash"
             mock_cache_manager.get_qa_cache.return_value = None
 
@@ -200,12 +223,9 @@ class TestQAEngine:
         source_docs = [
             Document(
                 page_content="这是一个很长的测试内容" * 20,  # 超过300字符
-                metadata={"filename": "test1.txt", "page": 1}
+                metadata={"filename": "test1.txt", "page": 1},
             ),
-            Document(
-                page_content="短内容",
-                metadata={"filename": "test2.txt"}
-            )
+            Document(page_content="短内容", metadata={"filename": "test2.txt"}),
         ]
 
         sources = qa_engine._process_source_documents(source_docs)
@@ -227,7 +247,7 @@ class TestQAEngine:
         source_docs = [
             Document(page_content="正常内容", metadata={"filename": "test.txt"}),
             None,  # 无效文档
-            Document(page_content="", metadata={})  # 空内容文档
+            Document(page_content="", metadata={}),  # 空内容文档
         ]
 
         # 过滤掉None值
@@ -264,7 +284,7 @@ class TestQAEngine:
         mock_vector_store.get_collection_info.return_value = {"document_count": 10}
 
         # 模拟ask方法成功
-        with patch.object(qa_engine, 'ask') as mock_ask:
+        with patch.object(qa_engine, "ask") as mock_ask:
             mock_ask.return_value = QuestionResponse(
                 answer="测试回答", sources=[], processing_time=0.1
             )
@@ -279,7 +299,7 @@ class TestQAEngine:
         mock_vector_store.get_collection_info.return_value = {"document_count": 10}
 
         # 模拟ask方法失败
-        with patch.object(qa_engine, 'ask') as mock_ask:
+        with patch.object(qa_engine, "ask") as mock_ask:
             mock_ask.side_effect = Exception("QA测试失败")
 
             health = qa_engine.health_check()
@@ -297,13 +317,13 @@ class TestQAEngine:
             {"question": "问题1", "answer": "答案1"},
             {"question": "问题2", "answer": "答案2"},
             {"question": "问题3", "answer": "答案3"},
-            {"question": "问题4", "answer": "答案4"}  # 应该被截断
+            {"question": "问题4", "answer": "答案4"},  # 应该被截断
         ]
 
         context = qa_engine.get_conversation_context(history)
 
         # 应该只保留最近3轮对话
-        lines = context.split('\n')
+        lines = context.split("\n")
         assert len(lines) == 6  # 3轮对话 * 2行 (Q + A)
         assert "问题2" in context
         assert "问题3" in context
@@ -314,8 +334,8 @@ class TestQAEngine:
         """测试包含不完整对话的历史"""
         history = [
             {"question": "问题1"},  # 缺少答案
-            {"answer": "答案2"},    # 缺少问题
-            {"question": "问题3", "answer": "答案3"}  # 完整的对话
+            {"answer": "答案2"},  # 缺少问题
+            {"question": "问题3", "answer": "答案3"},  # 完整的对话
         ]
 
         context = qa_engine.get_conversation_context(history)
@@ -330,9 +350,9 @@ class TestQAEngine:
 class TestQAEngineIntegration:
     """QA Engine 集成测试"""
 
-    @patch('app.core.qa_engine.settings')
-    @patch('app.core.qa_engine.ChatOpenAI')
-    @patch('app.core.qa_engine.RetrievalQA')
+    @patch("app.core.qa_engine.settings")
+    @patch("app.core.qa_engine.ChatOpenAI")
+    @patch("app.core.qa_engine.RetrievalQA")
     def test_full_qa_workflow(self, mock_retrieval_qa, mock_chat_openai, mock_settings):
         """测试完整的问答工作流程"""
         # 模拟设置
@@ -341,7 +361,7 @@ class TestQAEngineIntegration:
         mock_settings.get_model_config.return_value = {
             "provider": "openai",
             "chat_model": "gpt-3.5-turbo",
-            "api_base_url": "https://api.openai.com/v1"
+            "api_base_url": "https://api.openai.com/v1",
         }
 
         # 模拟向量存储
@@ -363,12 +383,12 @@ class TestQAEngineIntegration:
             "result": "集成测试答案",
             "source_documents": [
                 Document(page_content="源文档内容", metadata={"filename": "source.txt"})
-            ]
+            ],
         }
         mock_retrieval_qa.from_chain_type.return_value = mock_qa_chain
 
         # 模拟缓存管理器
-        with patch('app.core.qa_engine.cache_manager') as mock_cache_manager:
+        with patch("app.core.qa_engine.cache_manager") as mock_cache_manager:
             mock_cache_manager.get_context_hash.return_value = "test_hash"
             mock_cache_manager.get_qa_cache.return_value = None
 

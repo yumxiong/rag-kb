@@ -1,24 +1,26 @@
 """
 Cache Manager 模块单元测试
 """
-import pytest
-import tempfile
-import os
-import sqlite3
+
 import json
+import os
+import pathlib
+import sqlite3
+import tempfile
 from datetime import datetime, timedelta
-from unittest.mock import patch, Mock
+from unittest.mock import Mock, patch
+
+import pytest
 from langchain_core.documents import Document
 
 from app.core.cache_manager import CacheManager
 
 
-import pathlib
-
 @pytest.fixture
 def temp_db_path(tmp_path: pathlib.Path):
     """为 TestCacheManagerIntegration 提供模块级 temp_db_path（不依赖类内同名夹具）"""
     return str(tmp_path / "cache_test.db")
+
 
 class TestCacheManager:
     """Cache Manager 测试类"""
@@ -26,7 +28,7 @@ class TestCacheManager:
     @pytest.fixture
     def temp_db_path(self):
         """创建临时数据库路径"""
-        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as temp_file:
             temp_path = temp_file.name
         yield temp_path
         # 清理临时文件
@@ -36,7 +38,7 @@ class TestCacheManager:
     @pytest.fixture
     def cache_manager(self, temp_db_path):
         """创建Cache Manager实例"""
-        with patch('app.core.cache_manager.settings') as mock_settings:
+        with patch("app.core.cache_manager.settings") as mock_settings:
             mock_settings.chroma_db_path = os.path.dirname(temp_db_path)
             return CacheManager(temp_db_path)
 
@@ -132,10 +134,13 @@ class TestCacheManager:
 
         # 验证访问计数
         with sqlite3.connect(cache_manager.cache_db_path) as conn:
-            cursor = conn.execute("""
+            cursor = conn.execute(
+                """
                 SELECT access_count FROM embedding_cache
                 WHERE text_hash = ? AND model_name = ?
-            """, (cache_manager._get_text_hash(text, model_name), model_name))
+            """,
+                (cache_manager._get_text_hash(text, model_name), model_name),
+            )
 
             result = cursor.fetchone()
             assert result[0] == 4  # 1次初始设置 + 3次访问
@@ -150,10 +155,13 @@ class TestCacheManager:
 
         # 验证存储的文本被截断
         with sqlite3.connect(cache_manager.cache_db_path) as conn:
-            cursor = conn.execute("""
+            cursor = conn.execute(
+                """
                 SELECT text_content FROM embedding_cache
                 WHERE text_hash = ?
-            """, (cache_manager._get_text_hash(long_text, model_name),))
+            """,
+                (cache_manager._get_text_hash(long_text, model_name),),
+            )
 
             result = cursor.fetchone()
             assert len(result[0]) <= 500
@@ -164,7 +172,11 @@ class TestCacheManager:
         context_hash = "test_context_hash"
         answer = "这是测试答案"
         sources = [
-            {"document_name": "test.txt", "content": "测试内容", "similarity_score": 0.9}
+            {
+                "document_name": "test.txt",
+                "content": "测试内容",
+                "similarity_score": 0.9,
+            }
         ]
         model_name = "test-model"
 
@@ -179,7 +191,9 @@ class TestCacheManager:
 
     def test_get_qa_cache_miss(self, cache_manager):
         """测试问答缓存未命中"""
-        result = cache_manager.get_qa_cache("不存在的问题", "不存在的上下文", "test-model")
+        result = cache_manager.get_qa_cache(
+            "不存在的问题", "不存在的上下文", "test-model"
+        )
         assert result is None
 
     def test_qa_cache_different_context(self, cache_manager):
@@ -219,10 +233,17 @@ class TestCacheManager:
 
         # 验证访问计数
         with sqlite3.connect(cache_manager.cache_db_path) as conn:
-            cursor = conn.execute("""
+            cursor = conn.execute(
+                """
                 SELECT access_count FROM qa_cache
                 WHERE question_hash = ?
-            """, (cache_manager._get_text_hash(f"{question}:{context_hash}", model_name),))
+            """,
+                (
+                    cache_manager._get_text_hash(
+                        f"{question}:{context_hash}", model_name
+                    ),
+                ),
+            )
 
             result = cursor.fetchone()
             assert result[0] == 3  # 1次初始设置 + 2次访问
@@ -235,14 +256,23 @@ class TestCacheManager:
         sources = []
         model_name = "test-model"
 
-        cache_manager.set_qa_cache(long_question, context_hash, answer, sources, model_name)
+        cache_manager.set_qa_cache(
+            long_question, context_hash, answer, sources, model_name
+        )
 
         # 验证存储的问题被截断
         with sqlite3.connect(cache_manager.cache_db_path) as conn:
-            cursor = conn.execute("""
+            cursor = conn.execute(
+                """
                 SELECT question FROM qa_cache
                 WHERE question_hash = ?
-            """, (cache_manager._get_text_hash(f"{long_question}:{context_hash}", model_name),))
+            """,
+                (
+                    cache_manager._get_text_hash(
+                        f"{long_question}:{context_hash}", model_name
+                    ),
+                ),
+            )
 
             result = cursor.fetchone()
             assert len(result[0]) <= 300
@@ -250,8 +280,14 @@ class TestCacheManager:
     def test_get_context_hash_with_documents(self, cache_manager):
         """测试文档上下文哈希生成"""
         documents = [
-            Document(page_content="这是第一个文档的内容" * 10, metadata={"filename": "doc1.txt"}),
-            Document(page_content="这是第二个文档的内容" * 10, metadata={"filename": "doc2.txt"})
+            Document(
+                page_content="这是第一个文档的内容" * 10,
+                metadata={"filename": "doc1.txt"},
+            ),
+            Document(
+                page_content="这是第二个文档的内容" * 10,
+                metadata={"filename": "doc2.txt"},
+            ),
         ]
 
         hash1 = cache_manager.get_context_hash(documents)
@@ -289,7 +325,9 @@ class TestCacheManager:
         cache_manager.set_qa_cache("问题1", "context1", "答案1", [], "model1")
 
         # 模拟时间过去，使缓存过期
-        past_time = (datetime.now() - timedelta(days=8)).isoformat()  # 8天前（超过7天TTL）
+        past_time = (
+            datetime.now() - timedelta(days=8)
+        ).isoformat()  # 8天前（超过7天TTL）
 
         with sqlite3.connect(cache_manager.cache_db_path) as conn:
             # 更新创建时间为过期时间
@@ -373,6 +411,7 @@ class TestCacheManager:
 
         # 等待过期（在实际测试中可以通过修改数据库中的时间戳来模拟）
         import time
+
         time.sleep(2)
 
         # 由于SQLite查询中使用的是相对时间，我们需要验证过期逻辑
@@ -388,12 +427,21 @@ class TestCacheManager:
 
         # 手动插入无效JSON到数据库
         with sqlite3.connect(cache_manager.cache_db_path) as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO embedding_cache
                 (text_hash, text_content, embedding, model_name, created_at, last_accessed)
                 VALUES (?, ?, ?, ?, ?, ?)
-            """, (text_hash, "测试文本", "无效JSON", "model1",
-                 datetime.now().isoformat(), datetime.now().isoformat()))
+            """,
+                (
+                    text_hash,
+                    "测试文本",
+                    "无效JSON",
+                    "model1",
+                    datetime.now().isoformat(),
+                    datetime.now().isoformat(),
+                ),
+            )
             conn.commit()
 
         # 尝试获取缓存，应该返回None而不是抛出异常
@@ -495,13 +543,15 @@ class TestCacheManagerIntegration:
             for i in range(50)
         ]
 
-        cache_manager.set_qa_cache("大源文档问题", "context", "答案", large_sources, "large-model")
+        cache_manager.set_qa_cache(
+            "大源文档问题", "context", "答案", large_sources, "large-model"
+        )
 
         result = cache_manager.get_qa_cache("大源文档问题", "context", "large-model")
         assert result is not None, "QA cache result should not be None"
         assert result["sources"] == large_sources
 
-    @patch('app.core.cache_manager.settings')
+    @patch("app.core.cache_manager.settings")
     def test_default_initialization_with_settings(self, mock_settings, temp_db_path):
         """测试使用默认设置初始化"""
         mock_settings.chroma_db_path = os.path.dirname(temp_db_path)
