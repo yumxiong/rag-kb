@@ -30,6 +30,8 @@ data/quotas/*
 !data/chroma_db/.gitkeep
 !data/job_status/.gitkeep
 data/eval_docs/*
+!data/eval_docs/.gitkeep
+
 
 # IDE
 .vscode/
@@ -38,10 +40,7 @@ data/eval_docs/*
 *.swo
 .windsurf/
 .augment/
-.cursor/
 .qoder/
-.claude/
-
 
 # OS
 .DS_Store
