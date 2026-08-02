@@ -19,6 +19,7 @@ from typing import Any, Callable, Iterable
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from app.core.config import settings  # noqa: E402
+from app.core.document_processor import DocumentProcessor  # noqa: E402
 from app.core.vector_store import get_vector_store  # noqa: E402
 
 EVAL_COLLECTION = "rag_eval_documents"
@@ -172,7 +173,12 @@ def file_sha256(path: Path) -> str:
 
 
 def corpus_info() -> dict[str, Any]:
-    files = sorted(path for path in CORPUS_DIR.iterdir() if path.is_file())
+    processor = DocumentProcessor()
+    files = sorted(
+        path
+        for path in CORPUS_DIR.iterdir()
+        if path.is_file() and processor.is_supported_file(path.name)
+    )
     entries = []
     combined = hashlib.sha256()
     for path in files:
