@@ -2,13 +2,13 @@
 Cache Manager 模块单元测试
 """
 
-import json
 import os
 import pathlib
 import sqlite3
 import tempfile
+from contextlib import closing
 from datetime import datetime, timedelta
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 from langchain_core.documents import Document
@@ -44,13 +44,13 @@ class TestCacheManager:
 
     def test_initialization_creates_database(self, temp_db_path):
         """测试初始化创建数据库"""
-        cache_manager = CacheManager(temp_db_path)
+        CacheManager(temp_db_path)
 
         # 验证数据库文件存在
         assert os.path.exists(temp_db_path)
 
         # 验证表结构
-        with sqlite3.connect(temp_db_path) as conn:
+        with closing(sqlite3.connect(temp_db_path)) as conn:
             cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
             tables = [row[0] for row in cursor.fetchall()]
 
@@ -61,7 +61,7 @@ class TestCacheManager:
         """测试初始化创建索引"""
         CacheManager(temp_db_path)
 
-        with sqlite3.connect(temp_db_path) as conn:
+        with closing(sqlite3.connect(temp_db_path)) as conn:
             cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='index'")
             indexes = [row[0] for row in cursor.fetchall()]
 
@@ -133,7 +133,7 @@ class TestCacheManager:
             cache_manager.get_embedding_cache(text, model_name)
 
         # 验证访问计数
-        with sqlite3.connect(cache_manager.cache_db_path) as conn:
+        with closing(sqlite3.connect(cache_manager.cache_db_path)) as conn:
             cursor = conn.execute(
                 """
                 SELECT access_count FROM embedding_cache
@@ -154,7 +154,7 @@ class TestCacheManager:
         cache_manager.set_embedding_cache(long_text, embedding, model_name)
 
         # 验证存储的文本被截断
-        with sqlite3.connect(cache_manager.cache_db_path) as conn:
+        with closing(sqlite3.connect(cache_manager.cache_db_path)) as conn:
             cursor = conn.execute(
                 """
                 SELECT text_content FROM embedding_cache
@@ -232,7 +232,7 @@ class TestCacheManager:
             cache_manager.get_qa_cache(question, context_hash, model_name)
 
         # 验证访问计数
-        with sqlite3.connect(cache_manager.cache_db_path) as conn:
+        with closing(sqlite3.connect(cache_manager.cache_db_path)) as conn:
             cursor = conn.execute(
                 """
                 SELECT access_count FROM qa_cache
@@ -261,7 +261,7 @@ class TestCacheManager:
         )
 
         # 验证存储的问题被截断
-        with sqlite3.connect(cache_manager.cache_db_path) as conn:
+        with closing(sqlite3.connect(cache_manager.cache_db_path)) as conn:
             cursor = conn.execute(
                 """
                 SELECT question FROM qa_cache
@@ -329,7 +329,7 @@ class TestCacheManager:
             datetime.now() - timedelta(days=8)
         ).isoformat()  # 8天前（超过7天TTL）
 
-        with sqlite3.connect(cache_manager.cache_db_path) as conn:
+        with closing(sqlite3.connect(cache_manager.cache_db_path)) as conn:
             # 更新创建时间为过期时间
             conn.execute("UPDATE embedding_cache SET created_at = ?", (past_time,))
             conn.execute("UPDATE qa_cache SET created_at = ?", (past_time,))
@@ -426,11 +426,12 @@ class TestCacheManager:
         text_hash = cache_manager._get_text_hash("测试文本", "model1")
 
         # 手动插入无效JSON到数据库
-        with sqlite3.connect(cache_manager.cache_db_path) as conn:
+        with closing(sqlite3.connect(cache_manager.cache_db_path)) as conn:
             conn.execute(
                 """
                 INSERT INTO embedding_cache
-                (text_hash, text_content, embedding, model_name, created_at, last_accessed)
+                (text_hash, text_content, embedding, model_name,
+                 created_at, last_accessed)
                 VALUES (?, ?, ?, ?, ?, ?)
             """,
                 (
@@ -505,8 +506,6 @@ class TestCacheManagerIntegration:
 
         # 模拟多个"线程"设置和访问缓存
         base_text = "并发测试文本"
-        base_embedding = [0.1] * 768
-
         # 设置多个相似的缓存项
         for i in range(10):
             text = f"{base_text}{i}"
@@ -557,7 +556,7 @@ class TestCacheManagerIntegration:
         mock_settings.chroma_db_path = os.path.dirname(temp_db_path)
 
         # 不提供cache_db_path参数，应该使用默认路径
-        cache_manager = CacheManager()
+        CacheManager()
 
         # 验证数据库被创建
         expected_path = os.path.join(os.path.dirname(temp_db_path), "cache.db")

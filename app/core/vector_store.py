@@ -13,7 +13,6 @@ from langchain_community.embeddings import DashScopeEmbeddings
 from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 
-from app.core.cache_manager import cache_manager
 from app.core.cached_embeddings import CachedEmbeddings
 from app.core.config import settings
 
@@ -63,7 +62,8 @@ class VectorStore:
             api_key = settings.get_embedding_api_key()
             if not api_key:
                 raise ValueError(
-                    f"API key not configured for embedding provider: {settings.embedding_provider}"
+                    "API key not configured for embedding provider: "
+                    f"{settings.embedding_provider}"
                 )
 
             # 获取模型配置
@@ -112,7 +112,8 @@ class VectorStore:
             )
 
             logger.info(
-                f"Cached embeddings model initialized successfully: {provider}/{model_name}"
+                "Cached embeddings model initialized successfully: "
+                f"{provider}/{model_name}"
             )
 
         except Exception as e:
@@ -186,9 +187,10 @@ class VectorStore:
                 try:
                     if hasattr(self.vectorstore, "persist"):
                         self.vectorstore.persist()
-                except Exception as _:
+                except Exception:
                     logger.debug(
-                        "Vector store persist() not supported; skipping explicit persist"
+                        "Vector store persist() not supported; "
+                        "skipping explicit persist"
                     )
                 logger.info(
                     f"Added {len(documents)} documents to vector store (batch mode)"
@@ -219,12 +221,14 @@ class VectorStore:
                     try:
                         if hasattr(self.vectorstore, "persist"):
                             self.vectorstore.persist()
-                    except Exception as _:
+                    except Exception:
                         logger.debug(
-                            "Vector store persist() not supported; skipping explicit persist"
+                            "Vector store persist() not supported; "
+                            "skipping explicit persist"
                         )
                     logger.info(
-                        f"Added {len(successful_ids)}/{len(documents)} documents to vector store (individual mode)"
+                        f"Added {len(successful_ids)}/{len(documents)} documents "
+                        "to vector store (individual mode)"
                     )
                     return successful_ids
                 else:
@@ -278,7 +282,8 @@ class VectorStore:
             ]
 
             logger.info(
-                f"Found {len(filtered_results)} relevant documents (threshold: {effective_threshold})"
+                f"Found {len(filtered_results)} relevant documents "
+                f"(threshold: {effective_threshold})"
             )
             return filtered_results
 

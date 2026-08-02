@@ -1,10 +1,8 @@
-import json
 import logging
 import os
 import threading
 import time
-from concurrent.futures import Future, ThreadPoolExecutor
-from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, Optional
 
 from app.core.exceptions import CancellationError
@@ -153,7 +151,6 @@ class AsyncDocumentProcessor:
                 logger.info(f"Cleaned up file: {file_path}")
 
             # 如果文件已经移动到上传目录，也需要清理
-            from app.core.document_processor import doc_processor
             from app.core.job_status import job_status
 
             # 从 job_status 获取实际文件路径

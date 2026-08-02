@@ -5,7 +5,7 @@ Config 模块单元测试
 import base64
 import os
 import tempfile
-from unittest.mock import Mock, mock_open, patch
+from unittest.mock import mock_open, patch
 
 import pytest
 
@@ -422,7 +422,7 @@ class TestSettings:
         config = settings.get_model_config()
 
         assert config["provider"] == "deepseek"
-        assert config["chat_model"] == "deepseek-chat"  # 应该自动替换默认值
+        assert config["chat_model"] == "deepseek-v4-flash"
         assert config["api_base_url"] == "https://api.deepseek.com"
         assert config["embedding_api_base_url"] == "https://api.openai.com/v1"
 
@@ -492,7 +492,7 @@ class TestSettings:
         assert not os.path.exists(chroma_dir)
 
         # 创建设置实例应该创建目录
-        settings = Settings(upload_dir=upload_dir, chroma_db_path=chroma_dir)
+        Settings(upload_dir=upload_dir, chroma_db_path=chroma_dir)
 
         assert os.path.exists(upload_dir)
         assert os.path.exists(chroma_dir)

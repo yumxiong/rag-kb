@@ -2,14 +2,12 @@
 pytest配置文件
 """
 
-import json
 import logging
 import os
 import tempfile
 import threading
 import time
-from concurrent.futures import Future, ThreadPoolExecutor
-from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, Optional
 from unittest.mock import patch
 

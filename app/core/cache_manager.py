@@ -7,7 +7,7 @@ import json
 import logging
 import os
 import sqlite3
-import time
+from contextlib import closing
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
@@ -31,7 +31,7 @@ class CacheManager:
         """初始化缓存数据库"""
         os.makedirs(os.path.dirname(self.cache_db_path), exist_ok=True)
 
-        with sqlite3.connect(self.cache_db_path) as conn:
+        with closing(sqlite3.connect(self.cache_db_path)) as conn:
             # 嵌入缓存表
             conn.execute(
                 """
@@ -66,13 +66,15 @@ class CacheManager:
 
             # 创建索引提高查询性能
             conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_embedding_model ON embedding_cache(model_name)"
+                "CREATE INDEX IF NOT EXISTS idx_embedding_model "
+                "ON embedding_cache(model_name)"
             )
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_qa_model ON qa_cache(model_name)"
             )
             conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_embedding_access ON embedding_cache(last_accessed)"
+                "CREATE INDEX IF NOT EXISTS idx_embedding_access "
+                "ON embedding_cache(last_accessed)"
             )
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_qa_access ON qa_cache(last_accessed)"
@@ -89,11 +91,11 @@ class CacheManager:
         """获取嵌入缓存"""
         text_hash = self._get_text_hash(text, model_name)
 
-        with sqlite3.connect(self.cache_db_path) as conn:
+        with closing(sqlite3.connect(self.cache_db_path)) as conn:
             cursor = conn.execute(
                 """
-                SELECT embedding FROM embedding_cache 
-                WHERE text_hash = ? AND model_name = ? 
+                SELECT embedding FROM embedding_cache
+                WHERE text_hash = ? AND model_name = ?
                 AND datetime(created_at, '+{} seconds') > datetime('now')
             """.format(
                     self.embedding_cache_ttl
@@ -106,7 +108,7 @@ class CacheManager:
                 # 更新访问信息
                 conn.execute(
                     """
-                    UPDATE embedding_cache 
+                    UPDATE embedding_cache
                     SET last_accessed = ?, access_count = access_count + 1
                     WHERE text_hash = ?
                 """,
@@ -119,7 +121,7 @@ class CacheManager:
                     embedding = json.loads(result[0])
                     logger.debug(f"Embedding cache hit for text hash: {text_hash[:8]}")
                     return embedding
-                except:
+                except (TypeError, json.JSONDecodeError):
                     pass
 
         return None
@@ -131,11 +133,12 @@ class CacheManager:
         # 限制缓存的文本长度避免存储过大内容
         cached_text = text[:500] if len(text) > 500 else text
 
-        with sqlite3.connect(self.cache_db_path) as conn:
+        with closing(sqlite3.connect(self.cache_db_path)) as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO embedding_cache 
-                (text_hash, text_content, embedding, model_name, created_at, last_accessed)
+                INSERT OR REPLACE INTO embedding_cache
+                (text_hash, text_content, embedding, model_name,
+                 created_at, last_accessed)
                 VALUES (?, ?, ?, ?, ?, ?)
             """,
                 (
@@ -157,10 +160,10 @@ class CacheManager:
         """获取问答缓存"""
         question_hash = self._get_text_hash(f"{question}:{context_hash}", model_name)
 
-        with sqlite3.connect(self.cache_db_path) as conn:
+        with closing(sqlite3.connect(self.cache_db_path)) as conn:
             cursor = conn.execute(
                 """
-                SELECT answer, sources FROM qa_cache 
+                SELECT answer, sources FROM qa_cache
                 WHERE question_hash = ? AND model_name = ?
                 AND datetime(created_at, '+{} seconds') > datetime('now')
             """.format(
@@ -174,7 +177,7 @@ class CacheManager:
                 # 更新访问信息
                 conn.execute(
                     """
-                    UPDATE qa_cache 
+                    UPDATE qa_cache
                     SET last_accessed = ?, access_count = access_count + 1
                     WHERE question_hash = ?
                 """,
@@ -186,7 +189,7 @@ class CacheManager:
                     sources = json.loads(result[1]) if result[1] else []
                     logger.info(f"QA cache hit for question hash: {question_hash[:8]}")
                     return {"answer": result[0], "sources": sources}
-                except:
+                except (TypeError, json.JSONDecodeError):
                     pass
 
         return None
@@ -205,11 +208,12 @@ class CacheManager:
         # 限制缓存的问题长度
         cached_question = question[:300] if len(question) > 300 else question
 
-        with sqlite3.connect(self.cache_db_path) as conn:
+        with closing(sqlite3.connect(self.cache_db_path)) as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO qa_cache 
-                (question_hash, question, context_hash, answer, sources, model_name, created_at, last_accessed)
+                INSERT OR REPLACE INTO qa_cache
+                (question_hash, question, context_hash, answer, sources,
+                 model_name, created_at, last_accessed)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
                 (
@@ -253,14 +257,14 @@ class CacheManager:
 
     def cleanup_expired_cache(self):
         """清理过期缓存"""
-        with sqlite3.connect(self.cache_db_path) as conn:
+        with closing(sqlite3.connect(self.cache_db_path)) as conn:
             # 清理过期的嵌入缓存
             embedding_cutoff = datetime.now() - timedelta(
                 seconds=self.embedding_cache_ttl
             )
             conn.execute(
                 """
-                DELETE FROM embedding_cache 
+                DELETE FROM embedding_cache
                 WHERE datetime(created_at) < ?
             """,
                 (embedding_cutoff.isoformat(),),
@@ -270,7 +274,7 @@ class CacheManager:
             qa_cutoff = datetime.now() - timedelta(seconds=self.qa_cache_ttl)
             conn.execute(
                 """
-                DELETE FROM qa_cache 
+                DELETE FROM qa_cache
                 WHERE datetime(created_at) < ?
             """,
                 (qa_cutoff.isoformat(),),
@@ -282,7 +286,7 @@ class CacheManager:
 
     def clear_all_cache(self):
         """清空所有缓存"""
-        with sqlite3.connect(self.cache_db_path) as conn:
+        with closing(sqlite3.connect(self.cache_db_path)) as conn:
             # 清空嵌入缓存
             embedding_count = conn.execute(
                 "SELECT COUNT(*) FROM embedding_cache"
@@ -296,13 +300,14 @@ class CacheManager:
             conn.commit()
 
         logger.info(
-            f"All cache cleared: {embedding_count} embedding entries, {qa_count} QA entries"
+            f"All cache cleared: {embedding_count} embedding entries, "
+            f"{qa_count} QA entries"
         )
         return {"embedding_cleared": embedding_count, "qa_cleared": qa_count}
 
     def clear_qa_cache(self):
         """仅清空问答缓存"""
-        with sqlite3.connect(self.cache_db_path) as conn:
+        with closing(sqlite3.connect(self.cache_db_path)) as conn:
             qa_count = conn.execute("SELECT COUNT(*) FROM qa_cache").fetchone()[0]
             conn.execute("DELETE FROM qa_cache")
             conn.commit()
@@ -312,11 +317,11 @@ class CacheManager:
 
     def get_cache_stats(self) -> Dict[str, Any]:
         """获取缓存统计信息"""
-        with sqlite3.connect(self.cache_db_path) as conn:
+        with closing(sqlite3.connect(self.cache_db_path)) as conn:
             # 嵌入缓存统计
             embedding_cursor = conn.execute(
                 """
-                SELECT 
+                SELECT
                     COUNT(*) as total,
                     SUM(access_count) as total_hits,
                     AVG(access_count) as avg_hits,
@@ -329,7 +334,7 @@ class CacheManager:
             # 问答缓存统计
             qa_cursor = conn.execute(
                 """
-                SELECT 
+                SELECT
                     COUNT(*) as total,
                     SUM(access_count) as total_hits,
                     AVG(access_count) as avg_hits,

@@ -3,9 +3,8 @@
 """
 
 import threading
-import time
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import jwt
 import pytest
@@ -135,7 +134,6 @@ class TestCancelFunctionality:
 
     def test_job_status_mark_cancelled(self):
         """测试作业状态标记为已取消"""
-        import os
         import tempfile
 
         # 创建临时目录
