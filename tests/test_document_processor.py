@@ -4,7 +4,7 @@
 
 import os
 import tempfile
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -111,7 +111,10 @@ class TestDocumentProcessor:
         # 模拟输入文档 - 使用实际的文本分割器
         input_docs = [
             Document(
-                page_content="This is a long content that should be split into multiple chunks. "
+                page_content=(
+                    "This is a long content that should be split into multiple "
+                    "chunks. "
+                )
                 * 20,
                 metadata={"source": "test.txt"},
             )

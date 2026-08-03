@@ -4,12 +4,11 @@ Vector Store 模块单元测试
 
 import os
 import tempfile
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 from langchain_core.documents import Document
 
-from app.core.cached_embeddings import CachedEmbeddings
 from app.core.vector_store import VectorStore
 
 

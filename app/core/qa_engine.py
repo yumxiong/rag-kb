@@ -19,6 +19,15 @@ from app.models.schemas import QuestionResponse, SourceDocument
 logger = logging.getLogger(__name__)
 
 
+def _format_scored_candidate(doc: Document, score: float) -> str:
+    """Format a scored document for retrieval diagnostics."""
+    document_id = doc.metadata.get("document_id")
+    if not isinstance(document_id, str):
+        document_id = "unknown"
+    filename = doc.metadata.get("filename", "Unknown")
+    return f"(doc_id={document_id[:8]}, file={filename}, dist={score:.4f})"
+
+
 class QAEngine:
     """RAG问答引擎"""
 
@@ -69,7 +78,9 @@ class QAEngine:
             self.llm = ChatOpenAI(**llm_kwargs)
 
             logger.info(
-                f"LLM initialized successfully: {model_config['provider']}/{model_config['chat_model']}"
+                "LLM initialized successfully: %s/%s",
+                model_config["provider"],
+                model_config["chat_model"],
             )
 
         except Exception as e:
@@ -156,7 +167,8 @@ class QAEngine:
                     )
                 except Exception as _e:
                     logger.warning(
-                        f"Scored search failed under document scope, fallback to vanilla search: {_e}"
+                        "Scored search failed under document scope, "
+                        f"fallback to vanilla search: {_e}"
                     )
                     restricted_scored = []
                 # 全库打分（同阈值），用于与限定范围对比
@@ -180,27 +192,13 @@ class QAEngine:
                     top_r = restricted_scored[: min(3, len(restricted_scored))]
                     logger.info(
                         "Restricted top candidates: "
-                        + ", ".join(
-                            [
-                                (
-                                    lambda _d, _s: f"(doc_id={{(((_d.metadata.get('document_id'))[:8]) if isinstance(_d.metadata.get('document_id'), str) else 'unknown')}}, file={{_d.metadata.get('filename', 'Unknown')}}, dist={{_s:.4f}})"
-                                )(_d=d, _s=s)
-                                for d, s in top_r
-                            ]
-                        )
+                        + ", ".join(_format_scored_candidate(d, s) for d, s in top_r)
                     )
                 if global_scored:
                     top_g = global_scored[: min(3, len(global_scored))]
                     logger.info(
                         "Global top candidates: "
-                        + ", ".join(
-                            [
-                                (
-                                    lambda _d, _s: f"(doc_id={{(((_d.metadata.get('document_id'))[:8]) if isinstance(_d.metadata.get('document_id'), str) else 'unknown')}}, file={{_d.metadata.get('filename', 'Unknown')}}, dist={{_s:.4f}})"
-                                )(_d=d, _s=s)
-                                for d, s in top_g
-                            ]
-                        )
+                        + ", ".join(_format_scored_candidate(d, s) for d, s in top_g)
                     )
 
                 should_fallback = False
@@ -214,7 +212,8 @@ class QAEngine:
 
                 if should_fallback:
                     logger.info(
-                        f"Fallback to global: best_restricted={best_restricted}, best_global={best_global}, "
+                        f"Fallback to global: best_restricted={best_restricted}, "
+                        f"best_global={best_global}, "
                         f"threshold={settings.relevance_fallback_threshold}"
                     )
                     used_document_id = None
@@ -273,8 +272,9 @@ class QAEngine:
             if used_document_id:
                 retriever = self.vector_store.as_retriever(search_kwargs=search_kwargs)
                 logger.info(
-                    f"QAEngine.ask retrieval_mode=scoped user_source_limit={user_source_limit}"
-                    f"precheck_k={precheck_k} k_effective={k_effective} document_id={used_document_id}"
+                    "QAEngine.ask retrieval_mode=scoped "
+                    f"user_source_limit={user_source_limit} precheck_k={precheck_k} "
+                    f"k_effective={k_effective} document_id={used_document_id}"
                 )
             else:
                 mmr_kwargs = {
@@ -286,8 +286,10 @@ class QAEngine:
                     search_type="mmr", search_kwargs=mmr_kwargs
                 )
                 logger.info(
-                    f"QAEngine.ask retrieval_mode=global user_source_limit={user_source_limit}"
-                    f"precheck_k={precheck_k} k_effective={k_effective} fetch_k={global_fetch_k} lambda_mult={mmr_lambda_mult}"
+                    "QAEngine.ask retrieval_mode=global "
+                    f"user_source_limit={user_source_limit} precheck_k={precheck_k} "
+                    f"k_effective={k_effective} fetch_k={global_fetch_k} "
+                    f"lambda_mult={mmr_lambda_mult}"
                 )
 
             qa_chain = self._build_qa_chain(retriever=retriever)
@@ -309,7 +311,8 @@ class QAEngine:
                 after = len(source_docs)
                 if after < before:
                     logger.info(
-                        f"Filtered source documents by document_id={used_document_id}: {before} -> {after}"
+                        "Filtered source documents by document_id="
+                        f"{used_document_id}: {before} -> {after}"
                     )
 
             # 处理源文档

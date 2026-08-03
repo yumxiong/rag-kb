@@ -10,11 +10,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
 
-from langchain_community.document_loaders import (
-    PyPDFLoader,
-    TextLoader,
-    UnstructuredWordDocumentLoader,
-)
+from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
@@ -53,9 +49,6 @@ class WordDocumentLoader:
     def load(self) -> List[Document]:
         """加载Word文档内容"""
         try:
-            import xml.etree.ElementTree as ET
-            import zipfile
-
             content = ""
 
             # 检查文件扩展名

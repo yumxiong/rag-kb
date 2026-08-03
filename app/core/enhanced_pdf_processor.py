@@ -5,8 +5,7 @@
 
 import io
 import logging
-import os
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional
 
 import fitz  # PyMuPDF
 from langchain_core.documents import Document
@@ -29,11 +28,12 @@ class EnhancedPDFProcessor:
     def _check_ocr_availability(self) -> bool:
         """检查OCR库是否可用"""
         try:
+            import PIL.Image
             import pytesseract
-            from PIL import Image
 
             # 尝试检测Tesseract是否正确安装
             pytesseract.get_tesseract_version()
+            logger.debug("PIL image module loaded: %s", PIL.Image.__name__)
             logger.info("OCR功能可用 (Tesseract + PIL)")
             return True
         except Exception as e:
@@ -46,10 +46,10 @@ class EnhancedPDFProcessor:
     def _check_image_extraction_availability(self) -> bool:
         """检查图像提取库是否可用"""
         try:
-            from PIL import Image
+            import PIL.Image
 
             logger.info("图像处理功能可用 (PIL)")
-            return True
+            return PIL.Image is not None
         except ImportError:
             logger.warning("图像处理功能不可用，请安装: pip install pillow")
             return False
@@ -236,7 +236,6 @@ class EnhancedPDFProcessor:
             return self._process_with_text_extraction(file_path, pdf_info)
 
         try:
-            import pytesseract
             from PIL import Image
 
             doc = fitz.open(file_path)
@@ -440,7 +439,7 @@ class EnhancedPDFProcessor:
         图像预处理以提高OCR质量
         """
         try:
-            from PIL import Image, ImageEnhance, ImageFilter, ImageOps
+            from PIL import ImageEnhance, ImageFilter, ImageOps
 
             # 转换为灰度
             if image.mode != "L":

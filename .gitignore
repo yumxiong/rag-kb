@@ -10,6 +10,9 @@ ENV/
 env.bak/
 venv.bak/
 .venv
+venv*/
+.venv*/
+
 
 # Environment variables
 .env
@@ -41,6 +44,13 @@ data/eval_docs/*
 .cursor/
 .qoder/
 .claude/
+.devin/
+
+# Generated evaluation output
+eval/results/
+!eval/results/.gitkeep
+
+
 
 
 # OS

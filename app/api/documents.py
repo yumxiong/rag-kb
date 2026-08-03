@@ -19,7 +19,7 @@ from app.core.config import settings
 from app.core.document_processor import DocumentProcessor
 from app.core.job_status import job_status
 from app.core.vector_store import VectorStore
-from app.models.schemas import ApiResponse, Document
+from app.models.schemas import Document
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,10 @@ async def upload_document_async(
         if not doc_processor.is_supported_file(display_filename):
             raise HTTPException(
                 status_code=400,
-                detail=f"Unsupported file type. Supported types: {list(doc_processor.supported_extensions)}",
+                detail=(
+                    "Unsupported file type. Supported types: "
+                    f"{list(doc_processor.supported_extensions)}"
+                ),
             )
 
         # 检查文件大小
@@ -59,7 +62,10 @@ async def upload_document_async(
         if len(file_content) > max_size_bytes:
             raise HTTPException(
                 status_code=400,
-                detail=f"File size too large. Maximum size is {settings.max_file_size_mb}MB.",
+                detail=(
+                    "File size too large. Maximum size is "
+                    f"{settings.max_file_size_mb}MB."
+                ),
             )
 
         content_hash = doc_processor.compute_content_hash(file_content)
@@ -123,7 +129,10 @@ async def upload_document(
         if not doc_processor.is_supported_file(display_filename):
             raise HTTPException(
                 status_code=400,
-                detail=f"Unsupported file type. Supported types: {list(doc_processor.supported_extensions)}",
+                detail=(
+                    "Unsupported file type. Supported types: "
+                    f"{list(doc_processor.supported_extensions)}"
+                ),
             )
 
         # 检查文件大小
@@ -132,7 +141,10 @@ async def upload_document(
         if len(file_content) > max_size_bytes:
             raise HTTPException(
                 status_code=400,
-                detail=f"File size too large. Maximum size is {settings.max_file_size_mb}MB.",
+                detail=(
+                    "File size too large. Maximum size is "
+                    f"{settings.max_file_size_mb}MB."
+                ),
             )
 
         content_hash = doc_processor.compute_content_hash(file_content)
@@ -187,7 +199,9 @@ async def upload_document(
 
             return {
                 "success": True,
-                "message": "File uploaded successfully and processing started in background",
+                "message": (
+                    "File uploaded successfully and processing started " "in background"
+                ),
                 "document": doc_record,
                 "job_id": job_id,
                 "document_id": None,
@@ -235,7 +249,9 @@ async def upload_document(
                 )
                 return {
                     "success": False,
-                    "message": f"Document processing failed: {result.get('error_message')}",
+                    "message": (
+                        "Document processing failed: " f"{result.get('error_message')}"
+                    ),
                     "document": doc_record,
                     "processing_mode": "sync",
                 }
@@ -307,7 +323,8 @@ async def process_document_background(
             # 添加到向量存储
             get_vector_store().add_documents(result["chunks"])
             logger.info(
-                f"Document {filename} processed successfully (job_id: {job_id}, document_id: {real_document_id})"
+                f"Document {filename} processed successfully "
+                f"(job_id: {job_id}, document_id: {real_document_id})"
             )
             try:
                 if job_id:
@@ -322,7 +339,8 @@ async def process_document_background(
                 pass
         else:
             logger.error(
-                f"Document processing failed (job_id: {job_id}): {result.get('error_message')}"
+                f"Document processing failed (job_id: {job_id}): "
+                f"{result.get('error_message')}"
             )
             try:
                 if job_id:
@@ -396,18 +414,36 @@ async def stream_processing_status(job_id: str, _: dict = Depends(require_admin)
                         break
                 else:
                     # 如果找不到状态，可能是刚提交还没开始处理，继续等待
-                    yield f"data: {json.dumps({'status': 'waiting', 'message': 'Waiting for processing to start...', 'job_id': job_id, 'document_id': None})}\n\n"
+                    waiting = {
+                        "status": "waiting",
+                        "message": "Waiting for processing to start...",
+                        "job_id": job_id,
+                        "document_id": None,
+                    }
+                    yield f"data: {json.dumps(waiting)}\n\n"
 
                 await asyncio.sleep(1.5)  # 1.5秒轮询间隔
                 retry_count += 1
 
             # 超时后发送超时状态
             if retry_count >= max_retries:
-                yield f"data: {json.dumps({'status': 'timeout', 'message': 'Status check timeout', 'job_id': job_id, 'document_id': None})}\n\n"
+                timeout = {
+                    "status": "timeout",
+                    "message": "Status check timeout",
+                    "job_id": job_id,
+                    "document_id": None,
+                }
+                yield f"data: {json.dumps(timeout)}\n\n"
 
         except Exception as e:
             logger.error(f"SSE stream error for job {job_id}: {str(e)}")
-            yield f"data: {json.dumps({'status': 'error', 'message': str(e), 'job_id': job_id, 'document_id': None})}\n\n"
+            error = {
+                "status": "error",
+                "message": str(e),
+                "job_id": job_id,
+                "document_id": None,
+            }
+            yield f"data: {json.dumps(error)}\n\n"
 
     return StreamingResponse(
         event_generator(),
@@ -546,7 +582,10 @@ async def delete_document(document_id: str, _: dict = Depends(require_admin)):
                 f"Document {filename} deleted successfully (vectors and file removed)"
             )
         elif file_error:
-            message = f"Document {filename} vectors deleted, but file removal failed: {file_error}"
+            message = (
+                f"Document {filename} vectors deleted, but file removal failed: "
+                f"{file_error}"
+            )
         else:
             message = (
                 f"Document {filename} deleted successfully (vectors only, no file path)"
@@ -598,7 +637,7 @@ async def batch_upload_documents(
                         {
                             "filename": display_filename,
                             "success": False,
-                            "error": f"Unsupported file type",
+                            "error": "Unsupported file type",
                         }
                     )
                     continue
@@ -610,7 +649,10 @@ async def batch_upload_documents(
                         {
                             "filename": display_filename,
                             "success": False,
-                            "error": f"File size too large. Maximum size is {settings.max_file_size_mb}MB.",
+                            "error": (
+                                "File size too large. Maximum size is "
+                                f"{settings.max_file_size_mb}MB."
+                            ),
                         }
                     )
                     continue

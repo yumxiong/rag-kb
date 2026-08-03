@@ -3,7 +3,6 @@
 """
 
 import base64
-import json
 import logging
 import os
 from typing import Any, Dict, Optional
@@ -81,8 +80,10 @@ class Settings(BaseSettings):
         "http://localhost:8501,http://127.0.0.1:8501"  # 允许的前端域名，逗号分隔
     )
     allowed_methods: str = "GET,POST,DELETE"  # 允许的HTTP方法
+    # 允许的请求头（含BYOK和SSE）
     allowed_headers: str = (
-        "Content-Type,Authorization,LLM-API-Key,LLM-Provider,LLM-Base-URL,LLM-Model,Cache-Control,Connection"  # 允许的请求头（含BYOK和SSE）
+        "Content-Type,Authorization,LLM-API-Key,LLM-Provider,LLM-Base-URL,"
+        "LLM-Model,Cache-Control,Connection"
     )
 
     # RAG配置
@@ -184,8 +185,8 @@ class Settings(BaseSettings):
                     key = f.read().strip()
                     if key:
                         return key
-            except Exception as e:
-                logger.warning(f"Failed to read API key from configured file")
+            except Exception:
+                logger.warning("Failed to read API key from configured file")
 
         # 方式3: 从base64编码的环境变量
         if self.api_key_base64:
@@ -193,8 +194,8 @@ class Settings(BaseSettings):
                 key = base64.b64decode(self.api_key_base64).decode("utf-8").strip()
                 if key:
                     return key
-            except Exception as e:
-                logger.warning(f"Failed to decode base64 API key")
+            except Exception:
+                logger.warning("Failed to decode base64 API key")
 
         # 向后兼容：方式4: 检查OpenAI特定配置
         if self.openai_api_key:
@@ -206,8 +207,8 @@ class Settings(BaseSettings):
                     key = f.read().strip()
                     if key:
                         return key
-            except Exception as e:
-                logger.warning(f"Failed to read OpenAI API key from configured file")
+            except Exception:
+                logger.warning("Failed to read OpenAI API key from configured file")
 
         if self.openai_api_key_base64:
             try:
@@ -216,8 +217,8 @@ class Settings(BaseSettings):
                 )
                 if key:
                     return key
-            except Exception as e:
-                logger.warning(f"Failed to decode configured OpenAI API key")
+            except Exception:
+                logger.warning("Failed to decode configured OpenAI API key")
 
         # 方式5: 从Docker secrets
         if self.llm_provider in {"openai", "deepseek"}:
@@ -231,8 +232,8 @@ class Settings(BaseSettings):
                     key = f.read().strip()
                     if key:
                         return key
-            except Exception as e:
-                logger.warning(f"Failed to read API key from Docker secret")
+            except Exception:
+                logger.warning("Failed to read API key from Docker secret")
 
         # 方式6: 从系统密钥环 (仅Linux/Mac)
         try:
@@ -246,10 +247,10 @@ class Settings(BaseSettings):
                 return key
         except ImportError:
             pass
-        except Exception as e:
-            logger.warning(f"Failed to get API key from system keyring")
+        except Exception:
+            logger.warning("Failed to get API key from system keyring")
 
-        logger.warning(f"No valid API key configured")
+        logger.warning("No valid API key configured")
         return None
 
     def get_openai_api_key(self) -> Optional[str]:
@@ -304,7 +305,8 @@ class Settings(BaseSettings):
 
         if not secret:
             raise RuntimeError(
-                "JWT secret is not configured. Please set JWT_SECRET, JWT_SECRET_FILE, or JWT_SECRET_BASE64."
+                "JWT secret is not configured. Please set JWT_SECRET, "
+                "JWT_SECRET_FILE, or JWT_SECRET_BASE64."
             )
 
         return secret
@@ -320,7 +322,9 @@ class Settings(BaseSettings):
 
         if not password_hash:
             raise RuntimeError(
-                "Admin password hash is not configured. Please set ADMIN_PASSWORD_HASH, ADMIN_PASSWORD_HASH_FILE, or ADMIN_PASSWORD_HASH_BASE64."
+                "Admin password hash is not configured. Please set "
+                "ADMIN_PASSWORD_HASH, ADMIN_PASSWORD_HASH_FILE, or "
+                "ADMIN_PASSWORD_HASH_BASE64."
             )
 
         return password_hash
@@ -337,8 +341,8 @@ class Settings(BaseSettings):
                     key = f.read().strip()
                     if key:
                         return key
-            except Exception as e:
-                logger.warning(f"Failed to read embedding API key from configured file")
+            except Exception:
+                logger.warning("Failed to read embedding API key from configured file")
         # 3) 从base64
         if self.embedding_api_key_base64:
             try:
@@ -349,8 +353,8 @@ class Settings(BaseSettings):
                 )
                 if key:
                     return key
-            except Exception as e:
-                logger.warning(f"Failed to decode configured embedding API key")
+            except Exception:
+                logger.warning("Failed to decode configured embedding API key")
         # 4) 提供商专用（zhipu 兼容旧行为）
         if self.embedding_provider == "zhipu" and self.zhipu_api_key:
             return self.zhipu_api_key
@@ -364,7 +368,7 @@ class Settings(BaseSettings):
 
         api_key = api_key.strip()
 
-        # Zhipu API keys have the format: xxxxxxxx.xxxxxxxxxxxxxx (32 char hex + . + 16 chars)
+        # Zhipu keys use: 32 hexadecimal characters, a dot, then 16 characters.
         # Check this first since it has a unique format
         if "." in api_key and len(api_key.split(".")) == 2:
             parts = api_key.split(".")
@@ -414,7 +418,8 @@ class Settings(BaseSettings):
             auto_detected = True
             if detected_provider != self.llm_provider:
                 logger.info(
-                    f"Auto-detected provider '{detected_provider}' based on API key format"
+                    f"Auto-detected provider '{detected_provider}' "
+                    "based on API key format"
                 )
 
         # 根据不同提供商设置默认值

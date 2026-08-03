@@ -8,9 +8,9 @@ import json
 import logging
 import os
 from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from threading import Lock
-from typing import Dict, Optional, Tuple
+from typing import Dict, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +92,7 @@ class QuotaManager:
             last_dt = datetime.fromisoformat(last_date)
             today = datetime.now().date()
             return last_dt.date() < today
-        except:
+        except (TypeError, ValueError):
             return True
 
     def check_and_increment(
@@ -142,7 +142,8 @@ class QuotaManager:
             # 检查是否超出配额
             if quota.used_count >= quota.daily_limit:
                 logger.warning(
-                    f"User {user_id[:8]}... exceeded quota: {quota.used_count}/{quota.daily_limit}"
+                    f"User {user_id[:8]}... exceeded quota: "
+                    f"{quota.used_count}/{quota.daily_limit}"
                 )
                 return False, quota
 
