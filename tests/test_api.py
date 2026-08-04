@@ -2,12 +2,10 @@
 API接口测试
 """
 
-import json
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 import jwt
-import pytest
 from fastapi.testclient import TestClient
 from langchain_core.documents import Document
 
@@ -389,23 +387,20 @@ class TestQAAPI:
         request_data = {"question": "  "}
         response = client.post("/api/qa/ask", json=request_data)
 
-        assert response.status_code == 400
-        assert "Question cannot be empty" in response.json()["detail"]
+        assert response.status_code == 422
+        detail = response.json()["detail"]
+        assert any("question" in item["loc"] for item in detail)
 
     def test_ask_question_too_long(self):
         """测试问题过长"""
         long_question = "a" * 2001
         request_data = {"question": long_question}
         response = client.post("/api/qa/ask", json=request_data)
-        assert response.status_code in [400, 422]
-        data = response.json()
-        if response.status_code == 400:
-            assert "Question length out of range" in data["detail"]
-        else:
-            assert (
-                "question length can not exceed 2000 characters"
-                in data["detail"][0]["msg"]
-            )
+        assert response.status_code == 422
+        errors = response.json()["detail"]
+        question_error = next(item for item in errors if "question" in item["loc"])
+        assert question_error["type"] == "string_too_long"
+        assert question_error["ctx"]["max_length"] == 2000
 
     def test_ask_question_max_sources_too_small(self):
         request_data = {"question": "测试问题", "max_sources": 0}

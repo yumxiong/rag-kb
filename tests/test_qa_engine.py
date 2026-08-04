@@ -2,7 +2,7 @@
 QA Engine 模块单元测试
 """
 
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 from langchain_core.documents import Document
@@ -115,7 +115,7 @@ class TestQAEngine:
             }
 
             with patch("app.core.qa_engine.RetrievalQA"):
-                engine = QAEngine(mock_vector_store)
+                QAEngine(mock_vector_store)
 
                 # 验证ChatOpenAI被正确调用
                 mock_chat_openai.assert_called_once()
@@ -260,7 +260,7 @@ class TestQAEngine:
         """测试健康检查 - 健康状态"""
         qa_engine.llm.predict.return_value = "Hello response"
 
-        health = qa_engine.health_check()
+        health = qa_engine.health_check(deep=True)
 
         assert health["status"] == "healthy"
         assert health["llm"] == "connected"
@@ -271,7 +271,7 @@ class TestQAEngine:
         """测试健康检查 - 不健康状态"""
         qa_engine.llm.predict.side_effect = Exception("连接失败")
 
-        health = qa_engine.health_check()
+        health = qa_engine.health_check(deep=True)
 
         assert health["status"] == "unhealthy"
         assert "error" in health
@@ -289,7 +289,7 @@ class TestQAEngine:
                 answer="测试回答", sources=[], processing_time=0.1
             )
 
-            health = qa_engine.health_check()
+            health = qa_engine.health_check(deep=True, with_qa=True)
 
             assert health["qa_chain"] == "working"
 
@@ -302,7 +302,7 @@ class TestQAEngine:
         with patch.object(qa_engine, "ask") as mock_ask:
             mock_ask.side_effect = Exception("QA测试失败")
 
-            health = qa_engine.health_check()
+            health = qa_engine.health_check(deep=True, with_qa=True)
 
             assert health["qa_chain"] == "failed"
 

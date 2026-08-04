@@ -3,7 +3,7 @@
 """
 
 import logging
-from typing import List, Optional
+from typing import List
 
 from langchain_core.embeddings import Embeddings
 

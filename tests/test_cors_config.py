@@ -2,9 +2,6 @@
 CORS配置测试
 """
 
-from unittest.mock import patch
-
-import pytest
 from fastapi.testclient import TestClient
 
 from app.core.config import Settings
@@ -27,7 +24,9 @@ class TestCORSConfig:
 
         # 测试多个域名
         settings = Settings(
-            allowed_origins="http://localhost:8501,https://example.com,https://www.example.com"
+            allowed_origins=(
+                "http://localhost:8501,https://example.com," "https://www.example.com"
+            )
         )
         origins = settings.get_cors_origins()
         assert origins == [

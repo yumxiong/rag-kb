@@ -3,11 +3,9 @@
 """
 
 import logging
-from typing import Any, List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import JSONResponse
-from langchain_openai import ChatOpenAI
 
 from app.api.auth import require_admin
 from app.core.config import settings
@@ -146,7 +144,10 @@ async def ask_question(payload: QuestionRequest, request: Request):
             # 在响应中添加配额信息（用于前端显示）
             remaining_quota = max(0, quota_info.daily_limit - quota_info.used_count)
             logger.info(
-                f"User quota: {quota_info.used_count}/{quota_info.daily_limit}, remaining: {remaining_quota}"
+                "User quota: %s/%s, remaining: %s",
+                quota_info.used_count,
+                quota_info.daily_limit,
+                remaining_quota,
             )
 
         engine = None
@@ -207,7 +208,10 @@ async def ask_question(payload: QuestionRequest, request: Request):
                                 docs = [doc for (doc, _) in global_scored][
                                     : max(k, settings.max_sources)
                                 ]
-                                fallback_note = "提示：在您选定的文档中未检索到更相关的内容，已自动在全库中扩大检索范围。\n\n"
+                                fallback_note = (
+                                    "提示：在您选定的文档中未检索到更相关的内容，"
+                                    "已自动在全库中扩大检索范围。\n\n"
+                                )
                             else:
                                 docs = []
                                 fallback_note = "提示：在您选定的文档以及全库中均未检索到相关内容。\n\n"
@@ -376,7 +380,8 @@ async def submit_feedback(
             )
 
         logger.info(
-            "User feedback received - rating=%s, question_length=%s, answer_length=%s, has_feedback=%s",
+            "User feedback received - rating=%s, question_length=%s, "
+            "answer_length=%s, has_feedback=%s",
             rating,
             len(question or ""),
             len(answer or ""),
@@ -526,7 +531,10 @@ async def get_quota_info(request: Request):
             "daily_limit": quota_info.daily_limit,
             "remaining": remaining,
             "last_reset_date": quota_info.last_reset_date,
-            "message": f"Using default API key - {remaining}/{quota_info.daily_limit} questions remaining today",
+            "message": (
+                f"Using default API key - {remaining}/{quota_info.daily_limit} "
+                "questions remaining today"
+            ),
         }
 
     except Exception as e:

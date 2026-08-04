@@ -112,7 +112,7 @@ class VectorStore:
             )
 
             logger.info(
-                f"Cached embeddings model initialized successfully: "
+                "Cached embeddings model initialized successfully: "
                 f"{provider}/{model_name}"
             )
 
