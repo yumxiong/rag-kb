@@ -6,6 +6,7 @@ __pycache__/
 .Python
 env/
 venv/
+venv311/
 ENV/
 env.bak/
 venv.bak/
@@ -33,6 +34,9 @@ data/quotas/*
 !data/chroma_db/.gitkeep
 !data/job_status/.gitkeep
 data/eval_docs/*
+!data/eval_docs/.gitkeep
+eval/results/
+
 
 # IDE
 .vscode/
@@ -41,8 +45,8 @@ data/eval_docs/*
 *.swo
 .windsurf/
 .augment/
-.cursor/
 .qoder/
+.cursor/
 .claude/
 .devin/
 

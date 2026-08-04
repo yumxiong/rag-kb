@@ -128,6 +128,7 @@ class VectorStore:
                 persist_directory=settings.chroma_db_path,
                 anonymized_telemetry=False,
                 allow_reset=True,
+                is_persistent=True,
             )
 
             # 使用直接的client_settings方式初始化Langchain的Chroma包装器
@@ -165,6 +166,17 @@ class VectorStore:
             # 兜底：如果轻量初始化失败，回退到完整初始化
             self._ensure_initialized()
 
+    def get_chroma(self, collection_name: str) -> Chroma:
+        self._ensure_initialized()
+        if collection_name == self.collection_name:
+            return self.vectorstore
+
+        return Chroma(
+            collection_name=collection_name,
+            embedding_function=self.embeddings,
+            client=self.chroma_client,
+        )
+
     def add_documents(self, documents: List[Document]) -> List[str]:
         """添加文档到向量存储"""
         self._ensure_initialized()
@@ -187,10 +199,11 @@ class VectorStore:
                 try:
                     if hasattr(self.vectorstore, "persist"):
                         self.vectorstore.persist()
-                except Exception:
+                except Exception as exc:
                     logger.debug(
                         "Vector store persist() not supported; "
-                        "skipping explicit persist"
+                        "skipping explicit persist: %s",
+                        exc,
                     )
                 logger.info(
                     f"Added {len(documents)} documents to vector store (batch mode)"
@@ -221,10 +234,11 @@ class VectorStore:
                     try:
                         if hasattr(self.vectorstore, "persist"):
                             self.vectorstore.persist()
-                    except Exception:
+                    except Exception as exc:
                         logger.debug(
                             "Vector store persist() not supported; "
-                            "skipping explicit persist"
+                            "skipping explicit persist: %s",
+                            exc,
                         )
                     logger.info(
                         f"Added {len(successful_ids)}/{len(documents)} documents "

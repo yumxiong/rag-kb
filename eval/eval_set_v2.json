@@ -1,0 +1,88 @@
+[
+    {
+      "id": "q1",
+      "question": "RAG 混合检索里，RRF 融合用的排名公式是什么？",
+      "type": "exact",
+      "expected_doc": "2026-06-08.md",
+      "match": {
+        "required": ["RRF", "1/(k+rank)"]
+      },
+      "note": "缩写和公式都要；BM25/关键词路应占优"
+    },
+    {
+      "id": "q2",
+      "question": "想单独测检索质量时，笔记里列了哪几个带 @K 的指标？",
+      "type": "exact",
+      "expected_doc": "2026-06-09.md",
+      "match": {
+        "required": ["Hit Rate @ K", "MRR @ K", "NDCG @ K"]
+      },
+      "note": "问「哪几个」，三个指标名都要"
+    },
+    {
+      "id": "q3",
+      "question": "作者现有的 RAG 知识库项目，前后端和向量库分别用了什么？",
+      "type": "exact",
+      "expected_doc": "2026-06-06.md",
+      "match": {
+        "required": ["streamlit", "fastapi", "Chromadb", "langchain"]
+      },
+      "note": "问「分别用了什么」，四件套都要"
+    },
+    {
+      "id": "q4",
+      "question": "读长文容易走神，笔记里觉得问题出在哪？又建议怎么读？",
+      "type": "semantic",
+      "expected_doc": "2026-05-31.md",
+      "match": {
+        "required": ["任务是开放的，目标是模糊的"],
+        "any_of": ["带着问题读", "先扫后读", "边读边产出"],
+        "any_of_min": 1
+      },
+      "note": "前半问必中；后半问三种读法命中其一即可"
+    },
+    {
+      "id": "q5",
+      "question": "筛目标公司时，作者说不能只看有没有社区，真正该看什么？",
+      "type": "semantic",
+      "expected_doc": "2026-06-05.md",
+      "match": {
+        "required": [
+          "直接够到一个能做招人决定的真人",
+          "让他看到我的作品"
+        ]
+      },
+      "note": "两个要点都是「该看什么」的核心，都要"
+    },
+    {
+      "id": "q6",
+      "question": "知乎专栏里，作者求职投递思路从海投改成了什么打法？",
+      "type": "semantic",
+      "expected_doc": "2026-06-07.md",
+      "match": {
+        "any_of": ["定向狙击", "不靠数量", "深入研究投入几家目标公司"],
+        "any_of_min": 1
+      },
+      "note": "三种说法同义；命中「定向狙击」等任一即可"
+    },
+    {
+      "id": "q7",
+      "question": "从6月8日到10日，评估集从「尺子」构思到方案A/B，主判据和方案B相对方案A少了什么、多了什么？",
+      "type": "multihop",
+      "expected_doc": "",
+      "match": {
+        "required": ["expected_snippets", "子串匹配", "golden_chunk_ids", "方案B"]
+      },
+      "note": "跨 06-08/06-09/06-10；top-k 合并后四个要点都要"
+    },
+    {
+      "id": "q8",
+      "question": "综合6月初几天笔记，枫清科技该放在什么档位？主战场精力大概怎么分？",
+      "type": "multihop",
+      "expected_doc": "",
+      "match": {
+        "required": ["够一够的目标 / 学习样本", "≥85%", "更够得着的目标"]
+      },
+      "note": "跨 06-03/06-05/06-06；档位 + 精力配比，三点都要"
+    }
+  ]

@@ -178,6 +178,46 @@ class TestVectorStore:
             assert call_kwargs["collection_name"] == "rag_documents"
             assert call_kwargs["persist_directory"] == temp_db_path
 
+    def test_get_chroma_returns_default_vectorstore(self, vector_store_instance):
+        """默认集合应复用现有VectorStore。"""
+        with patch.object(
+            vector_store_instance, "_ensure_initialized"
+        ) as mock_ensure_initialized:
+            result = vector_store_instance.get_chroma(
+                vector_store_instance.collection_name
+            )
+
+        assert result is vector_store_instance.vectorstore
+        mock_ensure_initialized.assert_called_once_with()
+
+    def test_get_chroma_creates_named_collection(self, vector_store_instance):
+        """指定集合应复用当前embeddings和Chroma client。"""
+        mock_eval_collection = Mock()
+
+        with patch("app.core.vector_store.Chroma") as mock_chroma:
+            mock_chroma.return_value = mock_eval_collection
+
+            result = vector_store_instance.get_chroma("rag_eval_documents")
+
+        assert result is mock_eval_collection
+        mock_chroma.assert_called_once_with(
+            collection_name="rag_eval_documents",
+            embedding_function=vector_store_instance.embeddings,
+            client=vector_store_instance.chroma_client,
+        )
+
+    def test_get_chroma_propagates_initialization_error(self, vector_store_instance):
+        """初始化失败时不应掩盖原始异常。"""
+        with patch.object(
+            vector_store_instance,
+            "_ensure_initialized",
+            side_effect=RuntimeError("initialization failed"),
+        ), patch("app.core.vector_store.Chroma") as mock_chroma:
+            with pytest.raises(RuntimeError, match="initialization failed"):
+                vector_store_instance.get_chroma("rag_eval_documents")
+
+        mock_chroma.assert_not_called()
+
     def test_add_documents_success(self, vector_store_instance):
         """测试成功添加文档"""
         documents = [

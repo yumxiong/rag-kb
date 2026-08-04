@@ -80,9 +80,9 @@ check-security: ## 检查安全配置
 	@python -c "from app.core.config import settings; key=settings.get_openai_api_key(); print('✅ API Key已配置' if key else '❌ API Key未配置')"
 
 check-public-ports: ## 检查8000/8501端口是否被公网发布
-  @echo "$(YELLOW)🔍 检查8000/8501端口是否被公网发布...$(NC)"
-  @bash scripts/check-public-ports.sh
-  
+	@echo "$(YELLOW)🔍 检查8000/8501端口是否被公网发布...$(NC)"
+	@bash scripts/check-public-ports.sh
+
 dev: ## 启动本地开发模式
 	@echo "$(YELLOW)🔧 启动本地开发模式...$(NC)"
 	@make env
@@ -157,29 +157,29 @@ setup-local-https: ## 设置本地HTTPS开发环境（生成mkcert证书）
 	fi
 
 dev-https: ## 启动本地HTTPS开发模式
-    @echo "$(YELLOW)🔐 启动本地HTTPS开发模式...$(NC)"
-    @if [ ! -f docker/nginx/certs/local-cert.pem ]; then \
-        echo "$(RED)❌ 证书未找到，请先运行: make setup-local-https$(NC)"; \
-        exit 1; \
-    fi
-    @make env
-    @echo "$(YELLOW)🐳 启动Docker服务...$(NC)"
-    cd docker && docker compose -f docker-compose.yml -f docker-compose.local-https.yml up -d --build
-    @echo "$(GREEN)✅ 本地HTTPS开发环境已启动$(NC)"
-    @echo "$(BLUE)🌐 访问地址:$(NC)"
-    @echo "   https://localhost"
-    @echo "   https://127.0.0.1"
-    @echo "   https://local.rag-kb.dev (需要添加hosts)"
-    @echo "$(BLUE)📊 查看日志: make docker-logs-https$(NC)"
-    @echo "$(BLUE)🛑 停止服务: make stop-https$(NC)"
- 
+	@echo "$(YELLOW)🔐 启动本地HTTPS开发模式...$(NC)"
+	@if [ ! -f docker/nginx/certs/local-cert.pem ]; then \
+		echo "$(RED)❌ 证书未找到，请先运行: make setup-local-https$(NC)"; \
+		exit 1; \
+	fi
+	@make env
+	@echo "$(YELLOW)🐳 启动Docker服务...$(NC)"
+	cd docker && docker compose -f docker-compose.yml -f docker-compose.local-https.yml up -d --build
+	@echo "$(GREEN)✅ 本地HTTPS开发环境已启动$(NC)"
+	@echo "$(BLUE)🌐 访问地址:$(NC)"
+	@echo "   https://localhost"
+	@echo "   https://127.0.0.1"
+	@echo "   https://local.rag-kb.dev (需要添加hosts)"
+	@echo "$(BLUE)📊 查看日志: make docker-logs-https$(NC)"
+	@echo "$(BLUE)🛑 停止服务: make stop-https$(NC)"
+
 stop-https: ## 停止本地HTTPS开发服务
-    @echo "$(YELLOW)🛑 停止本地HTTPS服务...$(NC)"
-    cd docker && docker compose -f docker-compose.yml -f docker-compose.local-https.yml down
-    @echo "$(GREEN)✅ 服务已停止$(NC)"
- 
+	@echo "$(YELLOW)🛑 停止本地HTTPS服务...$(NC)"
+	cd docker && docker compose -f docker-compose.yml -f docker-compose.local-https.yml down
+	@echo "$(GREEN)✅ 服务已停止$(NC)"
+
 docker-logs-https: ## 查看HTTPS开发环境日志
-    cd docker && docker compose -f docker-compose.yml -f docker-compose.local-https.yml logs -f
+	cd docker && docker compose -f docker-compose.yml -f docker-compose.local-https.yml logs -f
 
 test-https: ## 测试HTTPS配置
 	@echo "$(YELLOW)🧪 测试HTTPS配置...$(NC)"
