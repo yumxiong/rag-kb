@@ -12,7 +12,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable, Mapping
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
@@ -22,6 +22,11 @@ from app.core.document_processor import DocumentProcessor  # noqa: E402
 EVAL_COLLECTION = "rag_eval_documents"
 ROOT = Path(__file__).resolve().parents[1]
 CORPUS_DIR = ROOT / "data" / "eval_docs"
+CHUNK_REF_VERSION = 1
+MANIFEST_VERSION = 1
+CHUNK_REF_PREFIX = f"cr{CHUNK_REF_VERSION}:"
+SPLITTER_NAME = "RecursiveCharacterTextSplitter"
+SPLITTER_SEPARATORS = ["\n\n", "\n", " ", ""]
 
 
 def load_eval_set(path: Path) -> list[dict[str, Any]]:
@@ -37,6 +42,137 @@ def file_sha256(path: Path) -> str:
         for block in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def normalize_chunk_text(text: str) -> str:
+    """Normalize line endings without changing other meaningful whitespace."""
+    if not isinstance(text, str):
+        raise TypeError("chunk text must be a string")
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def text_sha256(text: str) -> str:
+    """Hash the normalized text seen by the retrieval system."""
+    normalized = normalize_chunk_text(text)
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+def make_chunk_ref(filename: str, chunk_index: int, text_digest: str) -> str:
+    """Build a deterministic evaluation reference for one chunk."""
+    if not isinstance(filename, str) or not filename:
+        raise ValueError("chunk filename must be a non-empty string")
+    if "\0" in filename:
+        raise ValueError("chunk filename must not contain NUL")
+    if isinstance(chunk_index, bool) or not isinstance(chunk_index, int):
+        raise TypeError("chunk_index must be an integer")
+    if chunk_index < 0:
+        raise ValueError("chunk_index must be non-negative")
+    if (
+        not isinstance(text_digest, str)
+        or len(text_digest) != 64
+        or any(char not in "0123456789abcdef" for char in text_digest)
+    ):
+        raise ValueError("text_digest must be a lowercase SHA-256 hex digest")
+
+    identity = f"{filename}\0{chunk_index}\0{text_digest}".encode("utf-8")
+    return CHUNK_REF_PREFIX + hashlib.sha256(identity).hexdigest()
+
+
+def splitter_info() -> dict[str, Any]:
+    """Return the chunking configuration used by ``DocumentProcessor``."""
+    return {
+        "name": SPLITTER_NAME,
+        "chunk_size": settings.chunk_size,
+        "chunk_overlap": settings.chunk_overlap,
+        "separators": list(SPLITTER_SEPARATORS),
+    }
+
+
+def _canonical_json_bytes(value: Mapping[str, Any]) -> bytes:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+
+
+def chunk_manifest_hash(manifest: Mapping[str, Any]) -> str:
+    """Hash manifest identity fields, excluding a previously stored hash."""
+    payload = dict(manifest)
+    payload.pop("chunk_manifest_hash", None)
+    return hashlib.sha256(_canonical_json_bytes(payload)).hexdigest()
+
+
+def build_chunk_manifest(
+    chunks: Iterable[Any], splitter: Mapping[str, Any] | None = None
+) -> dict[str, Any]:
+    """Build a deterministic, text-free manifest from actual evaluation chunks."""
+    entries = []
+    seen_locations: set[tuple[str, int]] = set()
+    seen_refs: set[str] = set()
+
+    for chunk in chunks:
+        text = getattr(chunk, "page_content", None)
+        metadata = getattr(chunk, "metadata", None)
+        if not isinstance(metadata, Mapping):
+            raise ValueError("each chunk must have mapping metadata")
+
+        filename = metadata.get("filename")
+        chunk_index = metadata.get("chunk_index")
+        if not isinstance(filename, str) or not filename:
+            raise ValueError("each chunk must have a non-empty filename")
+        if "\0" in filename:
+            raise ValueError("chunk filename must not contain NUL")
+        if isinstance(chunk_index, bool) or not isinstance(chunk_index, int):
+            raise ValueError("each chunk must have an integer chunk_index")
+        if chunk_index < 0:
+            raise ValueError("chunk_index must be non-negative")
+
+        normalized_text = normalize_chunk_text(text)
+        digest = text_sha256(normalized_text)
+        chunk_ref = make_chunk_ref(filename, chunk_index, digest)
+        location = (filename, chunk_index)
+        if location in seen_locations:
+            raise ValueError(
+                "duplicate chunk location: "
+                f"filename={filename!r}, index={chunk_index}"
+            )
+        if chunk_ref in seen_refs:
+            raise ValueError(f"duplicate chunk_ref: {chunk_ref}")
+        seen_locations.add(location)
+        seen_refs.add(chunk_ref)
+        entries.append(
+            {
+                "chunk_ref": chunk_ref,
+                "filename": filename,
+                "chunk_index": chunk_index,
+                "text_sha256": digest,
+                "chars": len(normalized_text),
+            }
+        )
+
+    entries.sort(
+        key=lambda entry: (
+            entry["filename"],
+            entry["chunk_index"],
+            entry["chunk_ref"],
+        )
+    )
+    splitter_source = splitter_info() if splitter is None else splitter
+    splitter_payload = json.loads(
+        _canonical_json_bytes(splitter_source).decode("utf-8")
+    )
+    manifest = {
+        "manifest_version": MANIFEST_VERSION,
+        "chunk_ref_version": CHUNK_REF_VERSION,
+        "splitter": splitter_payload,
+        "chunk_count": len(entries),
+        "chunks": entries,
+    }
+    manifest["chunk_manifest_hash"] = chunk_manifest_hash(manifest)
+    return manifest
 
 
 def corpus_info(corpus_dir: Path = CORPUS_DIR) -> dict[str, Any]:
