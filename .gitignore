@@ -35,7 +35,6 @@ data/quotas/*
 !data/job_status/.gitkeep
 data/eval_docs/*
 !data/eval_docs/.gitkeep
-eval/results/
 
 
 # IDE
@@ -51,7 +50,8 @@ eval/results/
 .devin/
 
 # Generated evaluation output
-eval/results/
+eval/results/*_vector-only.json
+eval/results/**/run.json
 !eval/results/.gitkeep
 
 
