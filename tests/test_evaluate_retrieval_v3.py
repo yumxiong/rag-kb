@@ -1,6 +1,6 @@
 from langchain_core.documents import Document
 
-from eval import evaluate_retrieval_v3
+from eval import evaluate_retrieval_v3, scoring
 
 
 def _chunk(text):
@@ -36,8 +36,8 @@ def test_required_evidence_accumulates_across_ranked_chunks_and_respects_k():
     item = _item({"required": ["证据甲", "证据乙"]})
     chunks = [_chunk("这里有证据甲"), _chunk("无关内容"), _chunk("这里有证据乙")]
 
-    before_completion = evaluate_retrieval_v3.score_question(item, chunks, k=2)
-    completed = evaluate_retrieval_v3.score_question(item, chunks, k=3)
+    before_completion = scoring.score_question(item, chunks, k=2)
+    completed = scoring.score_question(item, chunks, k=3)
 
     assert before_completion["hit"] is False
     assert before_completion["first_rank"] is None
@@ -55,9 +55,7 @@ def test_required_evidence_accumulates_across_ranked_chunks_and_respects_k():
 def test_any_of_defaults_to_one_match_and_counts_the_group_as_complete():
     item = _item({"any_of": ["方法甲", "方法乙", "方法丙"]}, "semantic")
 
-    result = evaluate_retrieval_v3.score_question(
-        item, [_chunk("笔记建议采用方法乙")], k=1
-    )
+    result = scoring.score_question(item, [_chunk("笔记建议采用方法乙")], k=1)
 
     assert result["hit"] is True
     assert result["first_rank"] == 1
@@ -77,8 +75,8 @@ def test_any_of_min_uses_the_threshold_for_hit_and_coverage():
     )
     chunks = [_chunk("先采用方法甲"), _chunk("再补充方法丙")]
 
-    below_threshold = evaluate_retrieval_v3.score_question(item, chunks, k=1)
-    at_threshold = evaluate_retrieval_v3.score_question(item, chunks, k=2)
+    below_threshold = scoring.score_question(item, chunks, k=1)
+    at_threshold = scoring.score_question(item, chunks, k=2)
 
     assert below_threshold["hit"] is False
     assert below_threshold["first_rank"] is None
@@ -102,8 +100,8 @@ def test_required_and_any_of_groups_must_both_be_satisfied():
     )
     chunks = [_chunk("建议使用方法甲"), _chunk("问题原因在这里")]
 
-    only_any_of = evaluate_retrieval_v3.score_question(item, chunks, k=1)
-    both_groups = evaluate_retrieval_v3.score_question(item, chunks, k=2)
+    only_any_of = scoring.score_question(item, chunks, k=1)
+    both_groups = scoring.score_question(item, chunks, k=2)
 
     assert only_any_of["hit"] is False
     assert only_any_of["first_rank"] is None
@@ -119,16 +117,12 @@ def test_required_and_any_of_groups_must_both_be_satisfied():
 def test_matching_normalizes_only_whitespace_and_case():
     snippets = ["MRR @ K"]
 
-    equivalent = evaluate_retrieval_v3.hits_in_chunk(
-        _chunk("The metric is mrr@k."), snippets
-    )
-    paraphrase = evaluate_retrieval_v3.hits_in_chunk(
-        _chunk("使用前 K 项平均倒数排名"), snippets
-    )
+    equivalent = scoring.hits_in_chunk(_chunk("The metric is mrr@k."), snippets)
+    paraphrase = scoring.hits_in_chunk(_chunk("使用前 K 项平均倒数排名"), snippets)
 
     assert equivalent == {"MRR @ K"}
     assert paraphrase == set()
-    assert evaluate_retrieval_v3._norm(" MRR \n@\tK ") == "mrr@k"
+    assert scoring._norm(" MRR \n@\tK ") == "mrr@k"
 
 
 def test_coverage_averages_required_and_any_of_group_progress_before_rounding():
@@ -139,7 +133,7 @@ def test_coverage_averages_required_and_any_of_group_progress_before_rounding():
     }
     found = {"必需甲", "可选乙"}
 
-    coverage = evaluate_retrieval_v3.coverage_scores(found, match)
+    coverage = scoring.coverage_scores(found, match)
 
     assert coverage == {"required": 0.333, "any_of": 0.5, "overall": 0.417}
 
@@ -147,9 +141,7 @@ def test_coverage_averages_required_and_any_of_group_progress_before_rounding():
 def test_one_chunk_can_contribute_multiple_required_snippets():
     item = _item({"required": ["RRF", "1/(k+rank)"]})
 
-    result = evaluate_retrieval_v3.score_question(
-        item, [_chunk("RRF 的公式是 1/(k+rank)")], k=1
-    )
+    result = scoring.score_question(item, [_chunk("RRF 的公式是 1/(k+rank)")], k=1)
 
     assert result["hit"] is True
     assert result["first_rank"] == 1
