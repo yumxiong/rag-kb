@@ -11,7 +11,7 @@ from collections import defaultdict
 from typing import Any, Iterable
 
 MATCHER_VERSION = 1
-SCORER_VERSION = 1
+SCORER_VERSION = 2
 
 
 def _norm(t: Any) -> str:
@@ -69,22 +69,61 @@ def coverage_scores(found: set[str], match: dict[str, Any] | None) -> dict[str, 
 def score_question(item: dict[str, Any], chunks: list[Any], k: int) -> dict[str, Any]:
     match = item.get("match") or {}
     required, any_pool, _ = _match_parts(match)
-    all_snippets = required + any_pool
+    all_snippets = list(dict.fromkeys(required + any_pool))
 
     cumulative: set[str] = set()
-    first_rank = None
+    snippet_ranks = {snippet: None for snippet in all_snippets}
+    completion_rank = None
+    earliest_evidence_rank = None
+    witness_chunks = []
     for rank, chunk in enumerate(chunks[:k], start=1):
-        cumulative |= hits_in_chunk(chunk, all_snippets)
-        if first_rank is None and is_hit(cumulative, match):
-            first_rank = rank
+        chunk_hits = hits_in_chunk(chunk, all_snippets)
+        if chunk_hits and earliest_evidence_rank is None:
+            earliest_evidence_rank = rank
+        new_hits = chunk_hits - cumulative
+        for snippet in all_snippets:
+            if snippet in new_hits:
+                snippet_ranks[snippet] = rank
+        if new_hits and completion_rank is None:
+            metadata = getattr(chunk, "metadata", None) or {}
+            witness = {
+                "rank": rank,
+                "chunk_ref": metadata.get("chunk_ref"),
+                "filename": metadata.get("filename"),
+                "chunk_index": metadata.get("chunk_index"),
+                "snippets": [
+                    snippet for snippet in all_snippets if snippet in new_hits
+                ],
+            }
+            if witness["chunk_ref"] is None and metadata.get("chunk_id"):
+                witness["chunk_id"] = metadata["chunk_id"]
+            witness_chunks.append(witness)
+        cumulative |= chunk_hits
+        if completion_rank is None and is_hit(cumulative, match):
+            completion_rank = rank
 
     hit = is_hit(cumulative, match)
     cov = coverage_scores(cumulative, match)
+    witness_documents = {
+        witness["filename"]
+        for witness in witness_chunks
+        if witness["filename"] is not None
+    }
     return {
         "id": item["id"],
         "type": item.get("type", "-"),
         "hit": hit,
-        "first_rank": first_rank,
+        "snippet_ranks": snippet_ranks,
+        "completion_rank": completion_rank,
+        "first_rank": completion_rank,
+        "earliest_evidence_rank": earliest_evidence_rank,
+        "hop_spread": (
+            completion_rank - earliest_evidence_rank
+            if completion_rank is not None and earliest_evidence_rank is not None
+            else None
+        ),
+        "witness_chunks": witness_chunks,
+        "witness_doc_count": len(witness_documents),
         "coverage": cov["overall"],
         "cov_required": cov["required"],
         "cov_any_of": cov["any_of"],
@@ -103,7 +142,9 @@ def aggregate(per_q: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     for question_type, rows in by_type.items():
         n = len(rows)
         hit = sum(1 for row in rows if row["hit"])
-        mrr = sum(1.0 / row["first_rank"] for row in rows if row["first_rank"])
+        mrr = sum(
+            1.0 / row["completion_rank"] for row in rows if row["completion_rank"]
+        )
         coverage = sum(row["coverage"] for row in rows)
         fully_covered = sum(1 for row in rows if row["fully_covered"])
         entry: dict[str, Any] = {
@@ -111,8 +152,25 @@ def aggregate(per_q: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
             "Hit": round(hit / n, 3),
             "Coverage": round(coverage / n, 3),
             "FullyCovered": round(fully_covered / n, 3),
+            "MRR": round(mrr / n, 3),
         }
-        if question_type in ("exact", "semantic"):
-            entry["MRR"] = round(mrr / n, 3)
+        if question_type == "multihop":
+            hit_rows = [row for row in rows if row["hit"]]
+            mean_hop_spread = (
+                sum((row["hop_spread"] or 0) for row in hit_rows) / len(hit_rows)
+                if hit_rows
+                else 0.0
+            )
+            mean_witness_chunks = sum(len(row["witness_chunks"]) for row in rows) / n
+            multi_doc = sum(
+                1 for row in rows if row["hit"] and row["witness_doc_count"] >= 2
+            )
+            entry.update(
+                {
+                    "MeanHopSpread": round(mean_hop_spread, 3),
+                    "MeanWitnessChunks": round(mean_witness_chunks, 3),
+                    "MultiDocRate": round(multi_doc / n, 3),
+                }
+            )
         result[question_type] = entry
     return result

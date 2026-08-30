@@ -41,12 +41,14 @@ def test_required_evidence_accumulates_across_ranked_chunks_and_respects_k():
 
     assert before_completion["hit"] is False
     assert before_completion["first_rank"] is None
+    assert before_completion["completion_rank"] is None
     assert before_completion["coverage"] == 0.5
     assert before_completion["cov_required"] == 0.5
     assert before_completion["fully_covered"] is False
 
     assert completed["hit"] is True
     assert completed["first_rank"] == 3
+    assert completed["completion_rank"] == completed["first_rank"]
     assert completed["coverage"] == 1.0
     assert completed["cov_required"] == 1.0
     assert completed["fully_covered"] is True

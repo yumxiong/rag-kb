@@ -119,9 +119,13 @@ def test_score_run_is_deterministic_and_contains_no_context_text(run_fixture):
     assert score["corpus_hash"] == "corpus-hash"
     assert score["chunk_manifest_hash"]
     assert score["chunk_ref_version"] == 1
-    assert score["scorer_version"] == 1
+    assert score["scorer_version"] == 2
     assert score["results"][1]["rows"][0]["hit"] is True
     assert score["results"][1]["rows"][0]["first_rank"] == 2
+    assert score["results"][1]["rows"][0]["completion_rank"] == 2
+    assert score["results"][1]["rows"][0]["witness_chunks"][0]["chunk_ref"].startswith(
+        "cr1:"
+    )
     serialized = second_bytes.decode("utf-8")
     assert "alpha evidence" not in serialized
     assert "unrelated private body" not in serialized

@@ -87,7 +87,14 @@ def print_report(results: list[dict[str, Any]], artifact_path: Path) -> None:
             if "MRR" in entry:
                 fields.insert(2, f"MRR@{k}={entry['MRR']}")
             if question_type == "multihop":
-                fields.append(f"FullyCovered@{k}={entry['FullyCovered']}")
+                fields.extend(
+                    [
+                        f"FullyCovered@{k}={entry['FullyCovered']}",
+                        f"MeanHopSpread@{k}={entry['MeanHopSpread']}",
+                        f"MeanWitnessChunks@{k}={entry['MeanWitnessChunks']}",
+                        f"MultiDocRate@{k}={entry['MultiDocRate']}",
+                    ]
+                )
             print(f"[{question_type}] " + "  ".join(fields))
 
     max_result = max(results, key=lambda result: result["k"])
@@ -102,6 +109,16 @@ def print_report(results: list[dict[str, Any]], artifact_path: Path) -> None:
             f"{_fmt_sub_cov(row['cov_required'], row['has_required']):<6} "
             f"{_fmt_sub_cov(row['cov_any_of'], row['has_any_of']):<6}"
         )
+        if row["type"] == "multihop":
+            witness_refs = [
+                witness.get("chunk_ref") or witness.get("chunk_id") or "-"
+                for witness in row["witness_chunks"]
+            ]
+            print(
+                f"     snippets={row['snippet_ranks']} "
+                f"witnesses={witness_refs} docs={row['witness_doc_count']} "
+                f"spread={row['hop_spread']}"
+            )
     print(f"\nArtifact: {artifact_path}")
 
 
