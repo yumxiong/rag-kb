@@ -11,6 +11,7 @@ from collections import defaultdict
 from typing import Any, Iterable
 
 MATCHER_VERSION = 1
+SCORER_VERSION = 1
 
 
 def _norm(t: Any) -> str:
