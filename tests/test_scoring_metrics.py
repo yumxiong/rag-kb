@@ -1,6 +1,6 @@
 from langchain_core.documents import Document
 
-from eval import evaluate_retrieval_v3, scoring
+from eval import score_run, scoring
 
 
 def _chunk(text, filename, index, chunk_ref):
@@ -178,7 +178,7 @@ def test_terminal_report_includes_multihop_metrics_and_witness_refs(capsys, tmp_
         }
     ]
 
-    evaluate_retrieval_v3.print_report(results, tmp_path / "score.json")
+    score_run.print_report(results, tmp_path / "score.json")
     output = capsys.readouterr().out
 
     assert "MRR@2=" in output

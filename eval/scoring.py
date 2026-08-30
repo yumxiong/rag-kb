@@ -11,7 +11,11 @@ from collections import defaultdict
 from typing import Any, Iterable
 
 MATCHER_VERSION = 1
-SCORER_VERSION = 2
+SCORER_VERSION = 3
+
+
+class UnsupportedQuestionError(ValueError):
+    """Raised when a question needs a scoring protocol not implemented yet."""
 
 
 def _norm(t: Any) -> str:
@@ -67,8 +71,15 @@ def coverage_scores(found: set[str], match: dict[str, Any] | None) -> dict[str, 
 
 
 def score_question(item: dict[str, Any], chunks: list[Any], k: int) -> dict[str, Any]:
+    answerable = item.get("answerable", True)
+    if not isinstance(answerable, bool):
+        raise ValueError("answerable must be boolean")
+    if not answerable:
+        raise UnsupportedQuestionError("unanswerable/reject scoring is not implemented")
     match = item.get("match") or {}
     required, any_pool, _ = _match_parts(match)
+    if not required and not any_pool:
+        raise ValueError("empty match is not scoreable by the snippet scorer")
     all_snippets = list(dict.fromkeys(required + any_pool))
 
     cumulative: set[str] = set()

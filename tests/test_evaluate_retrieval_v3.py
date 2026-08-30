@@ -1,6 +1,8 @@
+import json
+
 from langchain_core.documents import Document
 
-from eval import evaluate_retrieval_v3, scoring
+from eval import evaluate_retrieval_v3, harness, scoring
 
 
 def _chunk(text):
@@ -23,13 +25,11 @@ def test_corpus_info_excludes_unsupported_files(tmp_path, monkeypatch):
     (tmp_path / "notes.unsupported").write_text("ignored", encoding="utf-8")
     (tmp_path / "nested.md").mkdir()
 
-    monkeypatch.setattr(evaluate_retrieval_v3, "CORPUS_DIR", tmp_path)
-
-    info = evaluate_retrieval_v3.corpus_info()
+    info = harness.corpus_info(tmp_path)
 
     assert [entry["name"] for entry in info["files"]] == [supported.name]
     assert info["files"][0]["bytes"] == len("test content")
-    assert info["files"][0]["sha256"] == evaluate_retrieval_v3.file_sha256(supported)
+    assert info["files"][0]["sha256"] == harness.file_sha256(supported)
 
 
 def test_required_evidence_accumulates_across_ranked_chunks_and_respects_k():
@@ -150,19 +150,31 @@ def test_one_chunk_can_contribute_multiple_required_snippets():
     assert result["coverage"] == 1.0
 
 
-def test_evaluate_sweep_retrieves_once_at_max_k_and_scores_ranked_prefixes():
-    item = _item({"required": ["证据甲", "证据乙"]})
+def test_entry_orchestrates_run_score_and_report(tmp_path, monkeypatch):
     calls = []
+    run_path = tmp_path / "run.json"
+    run_path.write_text("{}", encoding="utf-8")
+    score_path = tmp_path / "score.json"
+    score_path.write_text(json.dumps({"results": [{"k": 1}]}), encoding="utf-8")
 
-    def retriever(question, k):
-        calls.append((question, k))
-        return [_chunk("证据甲"), _chunk("无关内容"), _chunk("证据乙")]
+    def fake_run():
+        calls.append("run")
+        return run_path
 
-    results = evaluate_retrieval_v3.evaluate_sweep(retriever, [item], [1, 3])
+    def fake_score(path):
+        calls.append(("score", path))
+        return score_path
 
-    assert calls == [(item["question"], 3)]
-    assert [result["k"] for result in results] == [1, 3]
-    assert results[0]["rows"][0]["hit"] is False
-    assert results[0]["rows"][0]["first_rank"] is None
-    assert results[1]["rows"][0]["hit"] is True
-    assert results[1]["rows"][0]["first_rank"] == 3
+    def fake_report(results, path):
+        calls.append(("report", results, path))
+
+    monkeypatch.setattr(evaluate_retrieval_v3.run_retrieval, "run", fake_run)
+    monkeypatch.setattr(evaluate_retrieval_v3.score_run, "score_run", fake_score)
+    monkeypatch.setattr(evaluate_retrieval_v3.score_run, "print_report", fake_report)
+
+    assert evaluate_retrieval_v3.run() == score_path
+    assert calls == [
+        "run",
+        ("score", run_path),
+        ("report", [{"k": 1}], score_path),
+    ]

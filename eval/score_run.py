@@ -205,6 +205,58 @@ def build_score_artifact(
     }
 
 
+def _fmt_sub_cov(value: float, applicable: bool) -> str:
+    return "-" if not applicable else str(value)
+
+
+def print_report(results: Sequence[Mapping[str, Any]], artifact_path: Path) -> None:
+    """Print aggregate metrics and per-question retrieval diagnostics."""
+    for result in results:
+        k = result["k"]
+        for question_type, entry in result["by_type"].items():
+            fields = [
+                f"n={entry['n']}",
+                f"Hit@{k}={entry['Hit']}",
+                f"MRR@{k}={entry['MRR']}",
+                f"Coverage@{k}={entry['Coverage']}",
+            ]
+            if question_type == "multihop":
+                fields.extend(
+                    [
+                        f"FullyCovered@{k}={entry['FullyCovered']}",
+                        f"MeanHopSpread@{k}={entry['MeanHopSpread']}",
+                        f"MeanWitnessChunks@{k}={entry['MeanWitnessChunks']}",
+                        f"MultiDocRate@{k}={entry['MultiDocRate']}",
+                    ]
+                )
+            print(f"[{question_type}] " + "  ".join(fields))
+
+    max_result = max(results, key=lambda result: result["k"])
+    print(f"\nPer question (k={max_result['k']}):")
+    print(
+        f"{'id':<4} {'type':<9} {'hit':<5} {'rank':<5} "
+        f"{'cov':<6} {'req':<6} {'any':<6}"
+    )
+    for row in max_result["rows"]:
+        print(
+            f"{row['id']:<4} {row['type']:<9} {str(row['hit']):<5} "
+            f"{row['completion_rank'] or '-':<5} {row['coverage']:<6} "
+            f"{_fmt_sub_cov(row['cov_required'], row['has_required']):<6} "
+            f"{_fmt_sub_cov(row['cov_any_of'], row['has_any_of']):<6}"
+        )
+        if row["type"] == "multihop":
+            witness_refs = [
+                witness.get("chunk_ref") or witness.get("chunk_id") or "-"
+                for witness in row["witness_chunks"]
+            ]
+            print(
+                f"     snippets={row['snippet_ranks']} "
+                f"witnesses={witness_refs} docs={row['witness_doc_count']} "
+                f"spread={row['hop_spread']}"
+            )
+    print(f"\nScore artifact: {artifact_path}")
+
+
 def score_run(
     run_path: Path,
     eval_set_path: Path | None = None,
