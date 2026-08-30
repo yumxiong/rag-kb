@@ -1,0 +1,1168 @@
+{
+  "schema_version": 1,
+  "source_run": {
+    "run_id": "20260830T165121269403",
+    "path": "eval/results/20260830T165121269403/run.json"
+  },
+  "retriever": "vector-only",
+  "eval_set": {
+    "path": "eval/eval_set_v3.json",
+    "sha256": "504ccf45c771d2175225a27379aebe4b3a53996913720ccae41c12632967f382"
+  },
+  "corpus_hash": "394a90c7124fe9fdf6d2a698f9f8d0c9151e9dfaa5a5cd023b3bcf5e16f1b93c",
+  "chunk_manifest_hash": "08d287420aff69f62636f4d40fa27f9d83e9b957144c34052878307ce9933285",
+  "chunk_ref_version": 1,
+  "scorer_version": 3,
+  "results": [
+    {
+      "k": 1,
+      "by_type": {
+        "exact": {
+          "n": 3,
+          "Hit": 0.333,
+          "Coverage": 0.5,
+          "FullyCovered": 0.333,
+          "MRR": 0.333
+        },
+        "semantic": {
+          "n": 3,
+          "Hit": 0.333,
+          "Coverage": 0.333,
+          "FullyCovered": 0.333,
+          "MRR": 0.333
+        },
+        "multihop": {
+          "n": 2,
+          "Hit": 0.0,
+          "Coverage": 0.5,
+          "FullyCovered": 0.0,
+          "MRR": 0.0,
+          "MeanHopSpread": 0.0,
+          "MeanWitnessChunks": 1.0,
+          "MultiDocRate": 0.0
+        }
+      },
+      "rows": [
+        {
+          "id": "q1",
+          "type": "exact",
+          "hit": true,
+          "snippet_ranks": {
+            "RRF": 1,
+            "1/(k+rank)": 1
+          },
+          "completion_rank": 1,
+          "first_rank": 1,
+          "earliest_evidence_rank": 1,
+          "hop_spread": 0,
+          "witness_chunks": [
+            {
+              "rank": 1,
+              "chunk_ref": "cr1:6988693f07db397b580bf938bba0e2e45eed8c15a9abe4ca84c5ff0582490eb0",
+              "filename": "2026-06-08.md",
+              "chunk_index": 0,
+              "snippets": [
+                "RRF",
+                "1/(k+rank)"
+              ]
+            }
+          ],
+          "witness_doc_count": 1,
+          "coverage": 1.0,
+          "cov_required": 1.0,
+          "cov_any_of": 1.0,
+          "fully_covered": true,
+          "has_required": true,
+          "has_any_of": false
+        },
+        {
+          "id": "q2",
+          "type": "exact",
+          "hit": false,
+          "snippet_ranks": {
+            "Hit Rate @ K": null,
+            "MRR @ K": null,
+            "NDCG @ K": null
+          },
+          "completion_rank": null,
+          "first_rank": null,
+          "earliest_evidence_rank": null,
+          "hop_spread": null,
+          "witness_chunks": [],
+          "witness_doc_count": 0,
+          "coverage": 0.0,
+          "cov_required": 0.0,
+          "cov_any_of": 1.0,
+          "fully_covered": false,
+          "has_required": true,
+          "has_any_of": false
+        },
+        {
+          "id": "q3",
+          "type": "exact",
+          "hit": false,
+          "snippet_ranks": {
+            "streamlit": 1,
+            "fastapi": 1,
+            "Chromadb": null,
+            "langchain": null
+          },
+          "completion_rank": null,
+          "first_rank": null,
+          "earliest_evidence_rank": 1,
+          "hop_spread": null,
+          "witness_chunks": [
+            {
+              "rank": 1,
+              "chunk_ref": "cr1:9d02e51e5d9f1bf5df4ef6bd3f4ed6bcc1d6716584c4a80db1dda3c306ec5095",
+              "filename": "2026-05-23.md",
+              "chunk_index": 0,
+              "snippets": [
+                "streamlit",
+                "fastapi"
+              ]
+            }
+          ],
+          "witness_doc_count": 1,
+          "coverage": 0.5,
+          "cov_required": 0.5,
+          "cov_any_of": 1.0,
+          "fully_covered": false,
+          "has_required": true,
+          "has_any_of": false
+        },
+        {
+          "id": "q4",
+          "type": "semantic",
+          "hit": true,
+          "snippet_ranks": {
+            "任务本身是开放的，目标是模糊的": 1,
+            "带着问题读": 1,
+            "先扫后读": 1,
+            "边读边产出": 1
+          },
+          "completion_rank": 1,
+          "first_rank": 1,
+          "earliest_evidence_rank": 1,
+          "hop_spread": 0,
+          "witness_chunks": [
+            {
+              "rank": 1,
+              "chunk_ref": "cr1:330228f9b912f64be234c1dd606f33ec76c44c4eca1e72a31c49b8bf41b9c43e",
+              "filename": "2026-05-31.md",
+              "chunk_index": 1,
+              "snippets": [
+                "任务本身是开放的，目标是模糊的",
+                "带着问题读",
+                "先扫后读",
+                "边读边产出"
+              ]
+            }
+          ],
+          "witness_doc_count": 1,
+          "coverage": 1.0,
+          "cov_required": 1.0,
+          "cov_any_of": 1.0,
+          "fully_covered": true,
+          "has_required": true,
+          "has_any_of": true
+        },
+        {
+          "id": "q5",
+          "type": "semantic",
+          "hit": false,
+          "snippet_ranks": {
+            "直接够到一个能做招人决定的真人": null,
+            "让他看到我的作品": null
+          },
+          "completion_rank": null,
+          "first_rank": null,
+          "earliest_evidence_rank": null,
+          "hop_spread": null,
+          "witness_chunks": [],
+          "witness_doc_count": 0,
+          "coverage": 0.0,
+          "cov_required": 0.0,
+          "cov_any_of": 1.0,
+          "fully_covered": false,
+          "has_required": true,
+          "has_any_of": false
+        },
+        {
+          "id": "q6",
+          "type": "semantic",
+          "hit": false,
+          "snippet_ranks": {
+            "定向狙击": null,
+            "不靠数量": null,
+            "深入研究投入几家目标公司": null
+          },
+          "completion_rank": null,
+          "first_rank": null,
+          "earliest_evidence_rank": null,
+          "hop_spread": null,
+          "witness_chunks": [],
+          "witness_doc_count": 0,
+          "coverage": 0.0,
+          "cov_required": 1.0,
+          "cov_any_of": 0.0,
+          "fully_covered": false,
+          "has_required": false,
+          "has_any_of": true
+        },
+        {
+          "id": "q7",
+          "type": "multihop",
+          "hit": false,
+          "snippet_ranks": {
+            "1/(k+rank)": 1,
+            "MRR @ K": null
+          },
+          "completion_rank": null,
+          "first_rank": null,
+          "earliest_evidence_rank": 1,
+          "hop_spread": null,
+          "witness_chunks": [
+            {
+              "rank": 1,
+              "chunk_ref": "cr1:6988693f07db397b580bf938bba0e2e45eed8c15a9abe4ca84c5ff0582490eb0",
+              "filename": "2026-06-08.md",
+              "chunk_index": 0,
+              "snippets": [
+                "1/(k+rank)"
+              ]
+            }
+          ],
+          "witness_doc_count": 1,
+          "coverage": 0.5,
+          "cov_required": 0.5,
+          "cov_any_of": 1.0,
+          "fully_covered": false,
+          "has_required": true,
+          "has_any_of": false
+        },
+        {
+          "id": "q8",
+          "type": "multihop",
+          "hit": false,
+          "snippet_ranks": {
+            "放在努力够一够的位置": 1,
+            "≥85%": null
+          },
+          "completion_rank": null,
+          "first_rank": null,
+          "earliest_evidence_rank": 1,
+          "hop_spread": null,
+          "witness_chunks": [
+            {
+              "rank": 1,
+              "chunk_ref": "cr1:f9515600f8f5aa656442ad44b6bf986c4fe3d11ec85c0e0d891eef2306126e62",
+              "filename": "2026-06-06.md",
+              "chunk_index": 0,
+              "snippets": [
+                "放在努力够一够的位置"
+              ]
+            }
+          ],
+          "witness_doc_count": 1,
+          "coverage": 0.5,
+          "cov_required": 0.5,
+          "cov_any_of": 1.0,
+          "fully_covered": false,
+          "has_required": true,
+          "has_any_of": false
+        }
+      ]
+    },
+    {
+      "k": 3,
+      "by_type": {
+        "exact": {
+          "n": 3,
+          "Hit": 0.667,
+          "Coverage": 0.833,
+          "FullyCovered": 0.667,
+          "MRR": 0.444
+        },
+        "semantic": {
+          "n": 3,
+          "Hit": 0.667,
+          "Coverage": 0.667,
+          "FullyCovered": 0.667,
+          "MRR": 0.5
+        },
+        "multihop": {
+          "n": 2,
+          "Hit": 0.0,
+          "Coverage": 0.5,
+          "FullyCovered": 0.0,
+          "MRR": 0.0,
+          "MeanHopSpread": 0.0,
+          "MeanWitnessChunks": 1.0,
+          "MultiDocRate": 0.0
+        }
+      },
+      "rows": [
+        {
+          "id": "q1",
+          "type": "exact",
+          "hit": true,
+          "snippet_ranks": {
+            "RRF": 1,
+            "1/(k+rank)": 1
+          },
+          "completion_rank": 1,
+          "first_rank": 1,
+          "earliest_evidence_rank": 1,
+          "hop_spread": 0,
+          "witness_chunks": [
+            {
+              "rank": 1,
+              "chunk_ref": "cr1:6988693f07db397b580bf938bba0e2e45eed8c15a9abe4ca84c5ff0582490eb0",
+              "filename": "2026-06-08.md",
+              "chunk_index": 0,
+              "snippets": [
+                "RRF",
+                "1/(k+rank)"
+              ]
+            }
+          ],
+          "witness_doc_count": 1,
+          "coverage": 1.0,
+          "cov_required": 1.0,
+          "cov_any_of": 1.0,
+          "fully_covered": true,
+          "has_required": true,
+          "has_any_of": false
+        },
+        {
+          "id": "q2",
+          "type": "exact",
+          "hit": true,
+          "snippet_ranks": {
+            "Hit Rate @ K": 3,
+            "MRR @ K": 3,
+            "NDCG @ K": 3
+          },
+          "completion_rank": 3,
+          "first_rank": 3,
+          "earliest_evidence_rank": 3,
+          "hop_spread": 0,
+          "witness_chunks": [
+            {
+              "rank": 3,
+              "chunk_ref": "cr1:e3eaf2357342134923a63619c665cc0ec34787de38cc58352916e1cb27fbc8f9",
+              "filename": "2026-06-09.md",
+              "chunk_index": 0,
+              "snippets": [
+                "Hit Rate @ K",
+                "MRR @ K",
+                "NDCG @ K"
+              ]
+            }
+          ],
+          "witness_doc_count": 1,
+          "coverage": 1.0,
+          "cov_required": 1.0,
+          "cov_any_of": 1.0,
+          "fully_covered": true,
+          "has_required": true,
+          "has_any_of": false
+        },
+        {
+          "id": "q3",
+          "type": "exact",
+          "hit": false,
+          "snippet_ranks": {
+            "streamlit": 1,
+            "fastapi": 1,
+            "Chromadb": null,
+            "langchain": null
+          },
+          "completion_rank": null,
+          "first_rank": null,
+          "earliest_evidence_rank": 1,
+          "hop_spread": null,
+          "witness_chunks": [
+            {
+              "rank": 1,
+              "chunk_ref": "cr1:9d02e51e5d9f1bf5df4ef6bd3f4ed6bcc1d6716584c4a80db1dda3c306ec5095",
+              "filename": "2026-05-23.md",
+              "chunk_index": 0,
+              "snippets": [
+                "streamlit",
+                "fastapi"
+              ]
+            }
+          ],
+          "witness_doc_count": 1,
+          "coverage": 0.5,
+          "cov_required": 0.5,
+          "cov_any_of": 1.0,
+          "fully_covered": false,
+          "has_required": true,
+          "has_any_of": false
+        },
+        {
+          "id": "q4",
+          "type": "semantic",
+          "hit": true,
+          "snippet_ranks": {
+            "任务本身是开放的，目标是模糊的": 1,
+            "带着问题读": 1,
+            "先扫后读": 1,
+            "边读边产出": 1
+          },
+          "completion_rank": 1,
+          "first_rank": 1,
+          "earliest_evidence_rank": 1,
+          "hop_spread": 0,
+          "witness_chunks": [
+            {
+              "rank": 1,
+              "chunk_ref": "cr1:330228f9b912f64be234c1dd606f33ec76c44c4eca1e72a31c49b8bf41b9c43e",
+              "filename": "2026-05-31.md",
+              "chunk_index": 1,
+              "snippets": [
+                "任务本身是开放的，目标是模糊的",
+                "带着问题读",
+                "先扫后读",
+                "边读边产出"
+              ]
+            }
+          ],
+          "witness_doc_count": 1,
+          "coverage": 1.0,
+          "cov_required": 1.0,
+          "cov_any_of": 1.0,
+          "fully_covered": true,
+          "has_required": true,
+          "has_any_of": true
+        },
+        {
+          "id": "q5",
+          "type": "semantic",
+          "hit": true,
+          "snippet_ranks": {
+            "直接够到一个能做招人决定的真人": 2,
+            "让他看到我的作品": 2
+          },
+          "completion_rank": 2,
+          "first_rank": 2,
+          "earliest_evidence_rank": 2,
+          "hop_spread": 0,
+          "witness_chunks": [
+            {
+              "rank": 2,
+              "chunk_ref": "cr1:aecf9b2ccd0c1a5bf75c3828fe74cca67a3fe277caa95dcdf70d819796338308",
+              "filename": "2026-06-05.md",
+              "chunk_index": 3,
+              "snippets": [
+                "直接够到一个能做招人决定的真人",
+                "让他看到我的作品"
+              ]
+            }
+          ],
+          "witness_doc_count": 1,
+          "coverage": 1.0,
+          "cov_required": 1.0,
+          "cov_any_of": 1.0,
+          "fully_covered": true,
+          "has_required": true,
+          "has_any_of": false
+        },
+        {
+          "id": "q6",
+          "type": "semantic",
+          "hit": false,
+          "snippet_ranks": {
+            "定向狙击": null,
+            "不靠数量": null,
+            "深入研究投入几家目标公司": null
+          },
+          "completion_rank": null,
+          "first_rank": null,
+          "earliest_evidence_rank": null,
+          "hop_spread": null,
+          "witness_chunks": [],
+          "witness_doc_count": 0,
+          "coverage": 0.0,
+          "cov_required": 1.0,
+          "cov_any_of": 0.0,
+          "fully_covered": false,
+          "has_required": false,
+          "has_any_of": true
+        },
+        {
+          "id": "q7",
+          "type": "multihop",
+          "hit": false,
+          "snippet_ranks": {
+            "1/(k+rank)": 1,
+            "MRR @ K": null
+          },
+          "completion_rank": null,
+          "first_rank": null,
+          "earliest_evidence_rank": 1,
+          "hop_spread": null,
+          "witness_chunks": [
+            {
+              "rank": 1,
+              "chunk_ref": "cr1:6988693f07db397b580bf938bba0e2e45eed8c15a9abe4ca84c5ff0582490eb0",
+              "filename": "2026-06-08.md",
+              "chunk_index": 0,
+              "snippets": [
+                "1/(k+rank)"
+              ]
+            }
+          ],
+          "witness_doc_count": 1,
+          "coverage": 0.5,
+          "cov_required": 0.5,
+          "cov_any_of": 1.0,
+          "fully_covered": false,
+          "has_required": true,
+          "has_any_of": false
+        },
+        {
+          "id": "q8",
+          "type": "multihop",
+          "hit": false,
+          "snippet_ranks": {
+            "放在努力够一够的位置": 1,
+            "≥85%": null
+          },
+          "completion_rank": null,
+          "first_rank": null,
+          "earliest_evidence_rank": 1,
+          "hop_spread": null,
+          "witness_chunks": [
+            {
+              "rank": 1,
+              "chunk_ref": "cr1:f9515600f8f5aa656442ad44b6bf986c4fe3d11ec85c0e0d891eef2306126e62",
+              "filename": "2026-06-06.md",
+              "chunk_index": 0,
+              "snippets": [
+                "放在努力够一够的位置"
+              ]
+            }
+          ],
+          "witness_doc_count": 1,
+          "coverage": 0.5,
+          "cov_required": 0.5,
+          "cov_any_of": 1.0,
+          "fully_covered": false,
+          "has_required": true,
+          "has_any_of": false
+        }
+      ]
+    },
+    {
+      "k": 5,
+      "by_type": {
+        "exact": {
+          "n": 3,
+          "Hit": 1.0,
+          "Coverage": 1.0,
+          "FullyCovered": 1.0,
+          "MRR": 0.528
+        },
+        "semantic": {
+          "n": 3,
+          "Hit": 0.667,
+          "Coverage": 0.667,
+          "FullyCovered": 0.667,
+          "MRR": 0.5
+        },
+        "multihop": {
+          "n": 2,
+          "Hit": 0.0,
+          "Coverage": 0.5,
+          "FullyCovered": 0.0,
+          "MRR": 0.0,
+          "MeanHopSpread": 0.0,
+          "MeanWitnessChunks": 1.0,
+          "MultiDocRate": 0.0
+        }
+      },
+      "rows": [
+        {
+          "id": "q1",
+          "type": "exact",
+          "hit": true,
+          "snippet_ranks": {
+            "RRF": 1,
+            "1/(k+rank)": 1
+          },
+          "completion_rank": 1,
+          "first_rank": 1,
+          "earliest_evidence_rank": 1,
+          "hop_spread": 0,
+          "witness_chunks": [
+            {
+              "rank": 1,
+              "chunk_ref": "cr1:6988693f07db397b580bf938bba0e2e45eed8c15a9abe4ca84c5ff0582490eb0",
+              "filename": "2026-06-08.md",
+              "chunk_index": 0,
+              "snippets": [
+                "RRF",
+                "1/(k+rank)"
+              ]
+            }
+          ],
+          "witness_doc_count": 1,
+          "coverage": 1.0,
+          "cov_required": 1.0,
+          "cov_any_of": 1.0,
+          "fully_covered": true,
+          "has_required": true,
+          "has_any_of": false
+        },
+        {
+          "id": "q2",
+          "type": "exact",
+          "hit": true,
+          "snippet_ranks": {
+            "Hit Rate @ K": 3,
+            "MRR @ K": 3,
+            "NDCG @ K": 3
+          },
+          "completion_rank": 3,
+          "first_rank": 3,
+          "earliest_evidence_rank": 3,
+          "hop_spread": 0,
+          "witness_chunks": [
+            {
+              "rank": 3,
+              "chunk_ref": "cr1:e3eaf2357342134923a63619c665cc0ec34787de38cc58352916e1cb27fbc8f9",
+              "filename": "2026-06-09.md",
+              "chunk_index": 0,
+              "snippets": [
+                "Hit Rate @ K",
+                "MRR @ K",
+                "NDCG @ K"
+              ]
+            }
+          ],
+          "witness_doc_count": 1,
+          "coverage": 1.0,
+          "cov_required": 1.0,
+          "cov_any_of": 1.0,
+          "fully_covered": true,
+          "has_required": true,
+          "has_any_of": false
+        },
+        {
+          "id": "q3",
+          "type": "exact",
+          "hit": true,
+          "snippet_ranks": {
+            "streamlit": 1,
+            "fastapi": 1,
+            "Chromadb": 4,
+            "langchain": 4
+          },
+          "completion_rank": 4,
+          "first_rank": 4,
+          "earliest_evidence_rank": 1,
+          "hop_spread": 3,
+          "witness_chunks": [
+            {
+              "rank": 1,
+              "chunk_ref": "cr1:9d02e51e5d9f1bf5df4ef6bd3f4ed6bcc1d6716584c4a80db1dda3c306ec5095",
+              "filename": "2026-05-23.md",
+              "chunk_index": 0,
+              "snippets": [
+                "streamlit",
+                "fastapi"
+              ]
+            },
+            {
+              "rank": 4,
+              "chunk_ref": "cr1:e4672115637c6b73e944c80cfb83d609855afc7570848c9a568a0349d4fa8dc3",
+              "filename": "2026-06-06.md",
+              "chunk_index": 3,
+              "snippets": [
+                "Chromadb",
+                "langchain"
+              ]
+            }
+          ],
+          "witness_doc_count": 2,
+          "coverage": 1.0,
+          "cov_required": 1.0,
+          "cov_any_of": 1.0,
+          "fully_covered": true,
+          "has_required": true,
+          "has_any_of": false
+        },
+        {
+          "id": "q4",
+          "type": "semantic",
+          "hit": true,
+          "snippet_ranks": {
+            "任务本身是开放的，目标是模糊的": 1,
+            "带着问题读": 1,
+            "先扫后读": 1,
+            "边读边产出": 1
+          },
+          "completion_rank": 1,
+          "first_rank": 1,
+          "earliest_evidence_rank": 1,
+          "hop_spread": 0,
+          "witness_chunks": [
+            {
+              "rank": 1,
+              "chunk_ref": "cr1:330228f9b912f64be234c1dd606f33ec76c44c4eca1e72a31c49b8bf41b9c43e",
+              "filename": "2026-05-31.md",
+              "chunk_index": 1,
+              "snippets": [
+                "任务本身是开放的，目标是模糊的",
+                "带着问题读",
+                "先扫后读",
+                "边读边产出"
+              ]
+            }
+          ],
+          "witness_doc_count": 1,
+          "coverage": 1.0,
+          "cov_required": 1.0,
+          "cov_any_of": 1.0,
+          "fully_covered": true,
+          "has_required": true,
+          "has_any_of": true
+        },
+        {
+          "id": "q5",
+          "type": "semantic",
+          "hit": true,
+          "snippet_ranks": {
+            "直接够到一个能做招人决定的真人": 2,
+            "让他看到我的作品": 2
+          },
+          "completion_rank": 2,
+          "first_rank": 2,
+          "earliest_evidence_rank": 2,
+          "hop_spread": 0,
+          "witness_chunks": [
+            {
+              "rank": 2,
+              "chunk_ref": "cr1:aecf9b2ccd0c1a5bf75c3828fe74cca67a3fe277caa95dcdf70d819796338308",
+              "filename": "2026-06-05.md",
+              "chunk_index": 3,
+              "snippets": [
+                "直接够到一个能做招人决定的真人",
+                "让他看到我的作品"
+              ]
+            }
+          ],
+          "witness_doc_count": 1,
+          "coverage": 1.0,
+          "cov_required": 1.0,
+          "cov_any_of": 1.0,
+          "fully_covered": true,
+          "has_required": true,
+          "has_any_of": false
+        },
+        {
+          "id": "q6",
+          "type": "semantic",
+          "hit": false,
+          "snippet_ranks": {
+            "定向狙击": null,
+            "不靠数量": null,
+            "深入研究投入几家目标公司": null
+          },
+          "completion_rank": null,
+          "first_rank": null,
+          "earliest_evidence_rank": null,
+          "hop_spread": null,
+          "witness_chunks": [],
+          "witness_doc_count": 0,
+          "coverage": 0.0,
+          "cov_required": 1.0,
+          "cov_any_of": 0.0,
+          "fully_covered": false,
+          "has_required": false,
+          "has_any_of": true
+        },
+        {
+          "id": "q7",
+          "type": "multihop",
+          "hit": false,
+          "snippet_ranks": {
+            "1/(k+rank)": 1,
+            "MRR @ K": null
+          },
+          "completion_rank": null,
+          "first_rank": null,
+          "earliest_evidence_rank": 1,
+          "hop_spread": null,
+          "witness_chunks": [
+            {
+              "rank": 1,
+              "chunk_ref": "cr1:6988693f07db397b580bf938bba0e2e45eed8c15a9abe4ca84c5ff0582490eb0",
+              "filename": "2026-06-08.md",
+              "chunk_index": 0,
+              "snippets": [
+                "1/(k+rank)"
+              ]
+            }
+          ],
+          "witness_doc_count": 1,
+          "coverage": 0.5,
+          "cov_required": 0.5,
+          "cov_any_of": 1.0,
+          "fully_covered": false,
+          "has_required": true,
+          "has_any_of": false
+        },
+        {
+          "id": "q8",
+          "type": "multihop",
+          "hit": false,
+          "snippet_ranks": {
+            "放在努力够一够的位置": 1,
+            "≥85%": null
+          },
+          "completion_rank": null,
+          "first_rank": null,
+          "earliest_evidence_rank": 1,
+          "hop_spread": null,
+          "witness_chunks": [
+            {
+              "rank": 1,
+              "chunk_ref": "cr1:f9515600f8f5aa656442ad44b6bf986c4fe3d11ec85c0e0d891eef2306126e62",
+              "filename": "2026-06-06.md",
+              "chunk_index": 0,
+              "snippets": [
+                "放在努力够一够的位置"
+              ]
+            }
+          ],
+          "witness_doc_count": 1,
+          "coverage": 0.5,
+          "cov_required": 0.5,
+          "cov_any_of": 1.0,
+          "fully_covered": false,
+          "has_required": true,
+          "has_any_of": false
+        }
+      ]
+    },
+    {
+      "k": 10,
+      "by_type": {
+        "exact": {
+          "n": 3,
+          "Hit": 1.0,
+          "Coverage": 1.0,
+          "FullyCovered": 1.0,
+          "MRR": 0.528
+        },
+        "semantic": {
+          "n": 3,
+          "Hit": 1.0,
+          "Coverage": 1.0,
+          "FullyCovered": 1.0,
+          "MRR": 0.548
+        },
+        "multihop": {
+          "n": 2,
+          "Hit": 0.5,
+          "Coverage": 0.75,
+          "FullyCovered": 0.5,
+          "MRR": 0.056,
+          "MeanHopSpread": 8.0,
+          "MeanWitnessChunks": 1.5,
+          "MultiDocRate": 0.5
+        }
+      },
+      "rows": [
+        {
+          "id": "q1",
+          "type": "exact",
+          "hit": true,
+          "snippet_ranks": {
+            "RRF": 1,
+            "1/(k+rank)": 1
+          },
+          "completion_rank": 1,
+          "first_rank": 1,
+          "earliest_evidence_rank": 1,
+          "hop_spread": 0,
+          "witness_chunks": [
+            {
+              "rank": 1,
+              "chunk_ref": "cr1:6988693f07db397b580bf938bba0e2e45eed8c15a9abe4ca84c5ff0582490eb0",
+              "filename": "2026-06-08.md",
+              "chunk_index": 0,
+              "snippets": [
+                "RRF",
+                "1/(k+rank)"
+              ]
+            }
+          ],
+          "witness_doc_count": 1,
+          "coverage": 1.0,
+          "cov_required": 1.0,
+          "cov_any_of": 1.0,
+          "fully_covered": true,
+          "has_required": true,
+          "has_any_of": false
+        },
+        {
+          "id": "q2",
+          "type": "exact",
+          "hit": true,
+          "snippet_ranks": {
+            "Hit Rate @ K": 3,
+            "MRR @ K": 3,
+            "NDCG @ K": 3
+          },
+          "completion_rank": 3,
+          "first_rank": 3,
+          "earliest_evidence_rank": 3,
+          "hop_spread": 0,
+          "witness_chunks": [
+            {
+              "rank": 3,
+              "chunk_ref": "cr1:e3eaf2357342134923a63619c665cc0ec34787de38cc58352916e1cb27fbc8f9",
+              "filename": "2026-06-09.md",
+              "chunk_index": 0,
+              "snippets": [
+                "Hit Rate @ K",
+                "MRR @ K",
+                "NDCG @ K"
+              ]
+            }
+          ],
+          "witness_doc_count": 1,
+          "coverage": 1.0,
+          "cov_required": 1.0,
+          "cov_any_of": 1.0,
+          "fully_covered": true,
+          "has_required": true,
+          "has_any_of": false
+        },
+        {
+          "id": "q3",
+          "type": "exact",
+          "hit": true,
+          "snippet_ranks": {
+            "streamlit": 1,
+            "fastapi": 1,
+            "Chromadb": 4,
+            "langchain": 4
+          },
+          "completion_rank": 4,
+          "first_rank": 4,
+          "earliest_evidence_rank": 1,
+          "hop_spread": 3,
+          "witness_chunks": [
+            {
+              "rank": 1,
+              "chunk_ref": "cr1:9d02e51e5d9f1bf5df4ef6bd3f4ed6bcc1d6716584c4a80db1dda3c306ec5095",
+              "filename": "2026-05-23.md",
+              "chunk_index": 0,
+              "snippets": [
+                "streamlit",
+                "fastapi"
+              ]
+            },
+            {
+              "rank": 4,
+              "chunk_ref": "cr1:e4672115637c6b73e944c80cfb83d609855afc7570848c9a568a0349d4fa8dc3",
+              "filename": "2026-06-06.md",
+              "chunk_index": 3,
+              "snippets": [
+                "Chromadb",
+                "langchain"
+              ]
+            }
+          ],
+          "witness_doc_count": 2,
+          "coverage": 1.0,
+          "cov_required": 1.0,
+          "cov_any_of": 1.0,
+          "fully_covered": true,
+          "has_required": true,
+          "has_any_of": false
+        },
+        {
+          "id": "q4",
+          "type": "semantic",
+          "hit": true,
+          "snippet_ranks": {
+            "任务本身是开放的，目标是模糊的": 1,
+            "带着问题读": 1,
+            "先扫后读": 1,
+            "边读边产出": 1
+          },
+          "completion_rank": 1,
+          "first_rank": 1,
+          "earliest_evidence_rank": 1,
+          "hop_spread": 0,
+          "witness_chunks": [
+            {
+              "rank": 1,
+              "chunk_ref": "cr1:330228f9b912f64be234c1dd606f33ec76c44c4eca1e72a31c49b8bf41b9c43e",
+              "filename": "2026-05-31.md",
+              "chunk_index": 1,
+              "snippets": [
+                "任务本身是开放的，目标是模糊的",
+                "带着问题读",
+                "先扫后读",
+                "边读边产出"
+              ]
+            }
+          ],
+          "witness_doc_count": 1,
+          "coverage": 1.0,
+          "cov_required": 1.0,
+          "cov_any_of": 1.0,
+          "fully_covered": true,
+          "has_required": true,
+          "has_any_of": true
+        },
+        {
+          "id": "q5",
+          "type": "semantic",
+          "hit": true,
+          "snippet_ranks": {
+            "直接够到一个能做招人决定的真人": 2,
+            "让他看到我的作品": 2
+          },
+          "completion_rank": 2,
+          "first_rank": 2,
+          "earliest_evidence_rank": 2,
+          "hop_spread": 0,
+          "witness_chunks": [
+            {
+              "rank": 2,
+              "chunk_ref": "cr1:aecf9b2ccd0c1a5bf75c3828fe74cca67a3fe277caa95dcdf70d819796338308",
+              "filename": "2026-06-05.md",
+              "chunk_index": 3,
+              "snippets": [
+                "直接够到一个能做招人决定的真人",
+                "让他看到我的作品"
+              ]
+            }
+          ],
+          "witness_doc_count": 1,
+          "coverage": 1.0,
+          "cov_required": 1.0,
+          "cov_any_of": 1.0,
+          "fully_covered": true,
+          "has_required": true,
+          "has_any_of": false
+        },
+        {
+          "id": "q6",
+          "type": "semantic",
+          "hit": true,
+          "snippet_ranks": {
+            "定向狙击": 7,
+            "不靠数量": 7,
+            "深入研究投入几家目标公司": 7
+          },
+          "completion_rank": 7,
+          "first_rank": 7,
+          "earliest_evidence_rank": 7,
+          "hop_spread": 0,
+          "witness_chunks": [
+            {
+              "rank": 7,
+              "chunk_ref": "cr1:116eea966e674444e503595349058abf5094d34b13731800c07a4dff044c2968",
+              "filename": "2026-06-07.md",
+              "chunk_index": 0,
+              "snippets": [
+                "定向狙击",
+                "不靠数量",
+                "深入研究投入几家目标公司"
+              ]
+            }
+          ],
+          "witness_doc_count": 1,
+          "coverage": 1.0,
+          "cov_required": 1.0,
+          "cov_any_of": 1.0,
+          "fully_covered": true,
+          "has_required": false,
+          "has_any_of": true
+        },
+        {
+          "id": "q7",
+          "type": "multihop",
+          "hit": true,
+          "snippet_ranks": {
+            "1/(k+rank)": 1,
+            "MRR @ K": 9
+          },
+          "completion_rank": 9,
+          "first_rank": 9,
+          "earliest_evidence_rank": 1,
+          "hop_spread": 8,
+          "witness_chunks": [
+            {
+              "rank": 1,
+              "chunk_ref": "cr1:6988693f07db397b580bf938bba0e2e45eed8c15a9abe4ca84c5ff0582490eb0",
+              "filename": "2026-06-08.md",
+              "chunk_index": 0,
+              "snippets": [
+                "1/(k+rank)"
+              ]
+            },
+            {
+              "rank": 9,
+              "chunk_ref": "cr1:e3eaf2357342134923a63619c665cc0ec34787de38cc58352916e1cb27fbc8f9",
+              "filename": "2026-06-09.md",
+              "chunk_index": 0,
+              "snippets": [
+                "MRR @ K"
+              ]
+            }
+          ],
+          "witness_doc_count": 2,
+          "coverage": 1.0,
+          "cov_required": 1.0,
+          "cov_any_of": 1.0,
+          "fully_covered": true,
+          "has_required": true,
+          "has_any_of": false
+        },
+        {
+          "id": "q8",
+          "type": "multihop",
+          "hit": false,
+          "snippet_ranks": {
+            "放在努力够一够的位置": 1,
+            "≥85%": null
+          },
+          "completion_rank": null,
+          "first_rank": null,
+          "earliest_evidence_rank": 1,
+          "hop_spread": null,
+          "witness_chunks": [
+            {
+              "rank": 1,
+              "chunk_ref": "cr1:f9515600f8f5aa656442ad44b6bf986c4fe3d11ec85c0e0d891eef2306126e62",
+              "filename": "2026-06-06.md",
+              "chunk_index": 0,
+              "snippets": [
+                "放在努力够一够的位置"
+              ]
+            }
+          ],
+          "witness_doc_count": 1,
+          "coverage": 0.5,
+          "cov_required": 0.5,
+          "cov_any_of": 1.0,
+          "fully_covered": false,
+          "has_required": true,
+          "has_any_of": false
+        }
+      ]
+    }
+  ]
+}
