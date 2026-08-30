@@ -252,7 +252,7 @@ def validate_collection(coll: Any, corpus: dict[str, Any]) -> None:
         raise RuntimeError(
             f"Collection metadata count {len(metadatas)} does not match count {count}"
         )
-    required = {"filename", "document_id", "chunk_id"}
+    required = {"filename", "document_id", "chunk_id", "chunk_index"}
     missing = [index for index, metadata in enumerate(metadatas) if not metadata]
     missing += [
         index

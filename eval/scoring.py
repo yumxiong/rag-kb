@@ -10,6 +10,8 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Any, Iterable
 
+MATCHER_VERSION = 1
+
 
 def _norm(t: Any) -> str:
     """Normalize text exactly as the historical scorer did."""
