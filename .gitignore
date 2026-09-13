@@ -50,6 +50,12 @@ data/eval_docs/*
 .devin/
 
 # Generated evaluation output
+# Legacy private datasets and scores; retain local copies only.
+/eval/eval_set.json
+/eval/eval_set_v1.json
+/eval/eval_set_v2.json
+/eval/eval_set_v3.json
+/eval/results/20260830T165121269403/
 eval/results/*_vector-only.json
 eval/results/**/run.json
 !eval/results/.gitkeep
@@ -58,6 +64,12 @@ eval/results/**/run.json
 
 
 # OS
+# Editor/manual backups
+*.bak
+*.bak.*
+*.backup
+*~
+
 .DS_Store
 Thumbs.db
 
