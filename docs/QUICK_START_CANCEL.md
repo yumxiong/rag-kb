@@ -205,6 +205,6 @@ INFO - Document processing cancelled: test.pdf
 ## 📚 更多信息
 
 - 详细使用指南：[CANCEL_TASK_GUIDE.md](CANCEL_TASK_GUIDE.md)
-- 功能实现总结：[CANCEL_FEATURE_SUMMARY.md](CANCEL_FEATURE_SUMMARY.md)
+- 功能实现总结：[CANCEL_FEATURE_SUMMARY.md](archive/CANCEL_FEATURE_SUMMARY.md)
 - API文档：http://localhost:8000/docs
 

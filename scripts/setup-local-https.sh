@@ -170,8 +170,8 @@ echo "   3. 访问: https://localhost"
 echo "   4. 测试: make test-https"
 echo ""
 echo "📚 如遇问题，查看文档："
-echo "   - QUICK_START_HTTPS.md"
-echo "   - HTTPS_SETUP_GUIDE.md"
+echo "   - docs/deployment/QUICK_START_HTTPS.md"
+echo "   - docs/deployment/HTTPS_SETUP_GUIDE.md"
 echo ""
 
 

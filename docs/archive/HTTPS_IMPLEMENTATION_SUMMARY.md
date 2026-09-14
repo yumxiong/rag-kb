@@ -1,5 +1,7 @@
 # ✅ HTTPS 实施完成总结
 
+> 历史记录：保留当时的需求或实施描述，不代表当前验收状态。现行入口见 [文档导航](../README.md)。文中的操作命令以仓库根目录为起点。
+
 ## 🎯 实施方案
 
 本项目已按照 **Nginx + mkcert（本地）→ Nginx/云厂商（生产）** 方案完成 HTTPS 配置。
@@ -212,20 +214,20 @@ DEBUG: False
 ## 📚 相关文档
 
 ### 使用文档
-- [快速开始指南](QUICK_START_HTTPS.md) - 3 分钟快速设置
-- [完整设置指南](HTTPS_SETUP_GUIDE.md) - 详细说明和故障排除
-- [Docker 部署指南](docker/README.md) - 所有 Docker 配置说明
+- [快速开始指南](../deployment/QUICK_START_HTTPS.md) - 3 分钟快速设置
+- [完整设置指南](../deployment/HTTPS_SETUP_GUIDE.md) - 详细说明和故障排除
+- [Docker 部署指南](../../docker/README.md) - 所有 Docker 配置说明
 
 ### 配置文件
-- [本地 HTTPS Nginx 配置](docker/nginx/conf.d/local-https.conf)
-- [生产环境配置模板](docker/nginx/conf.d/production.conf.template)
-- [本地 Docker Compose](docker/docker-compose.local-https.yml)
-- [生产 Docker Compose](docker/docker-compose.production.yml)
+- [本地 HTTPS Nginx 配置](../../docker/nginx/conf.d/local-https.conf)
+- [生产环境配置模板](../../docker/nginx/conf.d/production.conf.template)
+- [本地 Docker Compose](../../docker/docker-compose.local-https.yml)
+- 生产 Docker Compose：`docker/docker-compose.production.yml` 是本地生成文件，不随仓库提供；生成入口见 [部署指南](../../docker/README.md)。
 
 ### 脚本
-- [本地设置脚本 (Windows)](scripts/setup-local-https.bat)
-- [本地设置脚本 (Linux/Mac)](scripts/setup-local-https.sh)
-- [生产配置向导](scripts/setup-production-https.sh)
+- [本地设置脚本 (Windows)](../../scripts/setup-local-https.bat)
+- [本地设置脚本 (Linux/Mac)](../../scripts/setup-local-https.sh)
+- [生产配置向导](../../scripts/setup-production-https.sh)
 
 ## 💡 最佳实践
 
@@ -282,13 +284,13 @@ HTTPS 配置已经完全就绪！现在你有：
 ---
 
 **需要帮助？** 
-- 查看 [快速开始指南](QUICK_START_HTTPS.md)
-- 查看 [完整设置指南](HTTPS_SETUP_GUIDE.md)
-- 查看 [故障排除](HTTPS_SETUP_GUIDE.md#-故障排除)
+- 查看 [快速开始指南](../deployment/QUICK_START_HTTPS.md)
+- 查看 [完整设置指南](../deployment/HTTPS_SETUP_GUIDE.md)
+- 查看 [故障排除](../deployment/HTTPS_SETUP_GUIDE.md#-故障排除)
 
 **准备生产部署？**
 - 运行 `make setup-production-https`
-- 查看 [生产环境文档](docker/README.md#4-生产环境部署)
+- 查看 [生产环境文档](../../docker/README.md#4-生产环境部署)
 
 
 

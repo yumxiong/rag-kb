@@ -1,5 +1,7 @@
 # 🔐 本地 HTTPS 开发环境设置指南
 
+> 部署主入口：[Docker 部署指南](../../docker/README.md)。以下命令从仓库根目录执行；HTTPS 实测留待启动验收阶段。
+
 本指南将帮助你在本地设置完整的 HTTPS 开发环境。
 
 ## 📋 准备工作
@@ -302,9 +304,9 @@ make setup-local-https
 
 ## 📚 相关文档
 
-- [Docker 部署指南](docker/README.md)
-- [生产环境 HTTPS 配置](docker/nginx/conf.d/production.conf.template)
-- [安全配置指南](SECURITY.md)
+- [Docker 部署指南](../../docker/README.md)
+- [生产环境 HTTPS 配置](../../docker/nginx/conf.d/production.conf.template)
+- [安全配置指南](../../SECURITY.md)
 - [mkcert 官方文档](https://github.com/FiloSottile/mkcert)
 
 ## ✅ 配置完成检查清单

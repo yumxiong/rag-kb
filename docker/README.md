@@ -1,5 +1,9 @@
 # Docker 部署指南
 
+本文件是部署主入口。专题说明：[本地 HTTPS 设置](../docs/deployment/HTTPS_SETUP_GUIDE.md)、[快速操作](../docs/deployment/QUICK_START_HTTPS.md)、[HTTPS 故障排除](../docs/deployment/HTTPS_TROUBLESHOOTING.md)。历史实施记录见 [归档](../docs/archive/README.md)，其他主题见 [文档导航](../docs/README.md)。
+
+本文保留现有部署说明；端口、生成配置和依赖仍待核对，启动路径尚待实测。
+
 本目录包含 RAG 知识库系统的 Docker 部署配置。
 
 ## 📋 可用配置
@@ -321,7 +325,7 @@ docker-compose restart backend
 如果遇到问题：
 1. 查看本文档的故障排除部分
 2. 检查日志: `make docker-logs`
-3. 查看 [GitHub Issues](../../issues)
+3. 查看 [GitHub Issues](https://github.com/yumxiong/rag-kb/issues)
 4. 运行健康检查: `make test-https`
 
 

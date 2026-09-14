@@ -1,5 +1,7 @@
 # 🔧 HTTPS 配置故障排除指南
 
+> 部署主入口：[Docker 部署指南](../../docker/README.md)。以下命令从仓库根目录执行；HTTPS 实测留待启动验收阶段。
+
 本文档专门针对本地 HTTPS 开发环境的常见问题和解决方案。
 
 ## 🚨 最常见问题
@@ -391,8 +393,8 @@ open -a "Google Chrome" --args --ignore-certificate-errors --allow-insecure-loca
 
 - [快速开始指南](QUICK_START_HTTPS.md)
 - [完整设置指南](HTTPS_SETUP_GUIDE.md)
-- [实施总结](HTTPS_IMPLEMENTATION_SUMMARY.md)
-- [Docker 部署指南](docker/README.md)
+- [实施总结](../archive/HTTPS_IMPLEMENTATION_SUMMARY.md)
+- [Docker 部署指南](../../docker/README.md)
 
 ---
 

@@ -1,5 +1,7 @@
 # 🔄 HTTPS 证书生成脚本更新日志
 
+> 历史记录：保留当时的需求或实施描述，不代表当前验收状态。现行入口见 [文档导航](../README.md)。文中的操作命令以仓库根目录为起点。
+
 ## 📅 更新日期
 2025-10-18
 
@@ -255,7 +257,7 @@ bash scripts/setup-local-https.sh
 
 如果仍然遇到 `NET::ERR_CERT_AUTHORITY_INVALID` 错误：
 
-1. 查看 [HTTPS_TROUBLESHOOTING.md](HTTPS_TROUBLESHOOTING.md)
+1. 查看 [HTTPS_TROUBLESHOOTING.md](../deployment/HTTPS_TROUBLESHOOTING.md)
 2. 按照诊断步骤排查
 3. 最简单的解决方法：手动运行 `mkcert -install`（以管理员身份）
 
@@ -268,9 +270,9 @@ bash scripts/setup-local-https.sh
 
 ## 📚 相关文档
 
-- [快速开始指南](QUICK_START_HTTPS.md) - 3分钟快速设置
-- [完整设置指南](HTTPS_SETUP_GUIDE.md) - 详细说明
-- [故障排除指南](HTTPS_TROUBLESHOOTING.md) - 新增！专门的故障排除
+- [快速开始指南](../deployment/QUICK_START_HTTPS.md) - 3分钟快速设置
+- [完整设置指南](../deployment/HTTPS_SETUP_GUIDE.md) - 详细说明
+- [故障排除指南](../deployment/HTTPS_TROUBLESHOOTING.md) - 新增！专门的故障排除
 - [实施总结](HTTPS_IMPLEMENTATION_SUMMARY.md) - 整体方案说明
 
 ## 🎉 总结

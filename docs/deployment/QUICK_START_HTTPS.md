@@ -1,5 +1,7 @@
 # 🚀 本地 HTTPS 快速开始
 
+> 部署主入口：[Docker 部署指南](../../docker/README.md)。以下命令从仓库根目录执行；HTTPS 实测留待启动验收阶段。
+
 ## ⚡ 3 分钟快速设置
 
 ### 第 1 步: 安装 mkcert（仅首次需要）
@@ -79,7 +81,7 @@ make stop-https
 ## 📚 更多文档
 
 - [完整 HTTPS 设置指南](HTTPS_SETUP_GUIDE.md)
-- [Docker 部署指南](docker/README.md)
-- [生产环境配置](docker/nginx/conf.d/production.conf.template)
+- [Docker 部署指南](../../docker/README.md)
+- [生产环境配置](../../docker/nginx/conf.d/production.conf.template)
 
 

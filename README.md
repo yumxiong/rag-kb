@@ -1,5 +1,7 @@
 # RAG Knowledge Base
 
+[文档导航](docs/README.md) · [部署指南](docker/README.md) · [任务取消](docs/CANCEL_TASK_GUIDE.md)
+
 一个面向中文与多模型场景的 RAG（Retrieval-Augmented Generation）知识库系统：
 
 - 后端使用 **FastAPI** 提供文档、问答、配额、成本监控等 API
