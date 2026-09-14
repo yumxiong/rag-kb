@@ -77,22 +77,14 @@ make setup-local-https
 - ✅ 生成 localhost、127.0.0.1 等域名的证书
 - ✅ 将证书保存到 `docker/nginx/certs/` 目录
 
-### 步骤 2: 配置环境变量（可选）
+### 步骤 2: 配置容器环境变量
 
 复制环境配置示例：
 ```bash
-cp .env.local-https.example .env
+cp .env.secure.example .env.local-https
 ```
 
-编辑 `.env` 文件，配置你的 API Key：
-```bash
-# 推荐：使用环境变量
-# 在命令行中设置: set OPENAI_API_KEY=sk-xxx (Windows)
-# 或: export OPENAI_API_KEY=sk-xxx (Linux/Mac)
-
-# 或使用密钥环（最安全）
-python scripts/setup-keyring.py
-```
+编辑 `.env.local-https`，设置匹配提供商的 `API_KEY` 和 `EMBEDDING_API_KEY`。宿主机环境变量或 Keyring 不会自动注入容器；文件 Key 还需要额外挂载 secret 目录。不要覆盖已有配置。PowerShell 首次复制可用 `Copy-Item .env.secure.example .env.local-https`。
 
 ### 步骤 3: 启动 HTTPS 开发环境
 
@@ -102,7 +94,7 @@ make dev-https
 
 # 或直接使用 Docker Compose
 cd docker
-docker-compose -f docker-compose.local-https.yml up -d --build
+docker compose -f docker-compose.yml -f docker-compose.local-https.yml up -d --build
 ```
 
 ## 🌐 访问应用
@@ -160,10 +152,10 @@ make docker-logs-https
 
 # 查看服务状态
 cd docker
-docker-compose -f docker-compose.local-https.yml ps
+docker compose -f docker-compose.yml -f docker-compose.local-https.yml ps
 
 # 查看 Nginx 日志
-docker-compose -f docker-compose.local-https.yml logs nginx
+docker compose -f docker-compose.yml -f docker-compose.local-https.yml logs nginx
 ```
 
 ## 🛑 停止服务
@@ -174,7 +166,7 @@ make stop-https
 
 # 或直接使用 Docker Compose
 cd docker
-docker-compose -f docker-compose.local-https.yml down
+docker compose -f docker-compose.yml -f docker-compose.local-https.yml down
 ```
 
 ## 🔧 故障排除
@@ -269,7 +261,7 @@ make setup-local-https
 **错误**: 浏览器控制台显示 CORS 错误
 
 **解决**:
-1. 检查 `.env` 文件中的 `ALLOWED_ORIGINS`
+1. 检查 `.env.local-https` 文件中的 `ALLOWED_ORIGINS`
 2. 确保包含你访问的域名（https://localhost）
 3. 重启服务: `make stop-https && make dev-https`
 
@@ -337,6 +329,6 @@ make setup-local-https
 
 ---
 
-**需要帮助？** 查看 [故障排除](#-故障排除) 部分或提交 [GitHub Issue](https://github.com/your-repo/issues)。
+**需要帮助？** 查看 [故障排除](#-故障排除) 部分或提交 [GitHub Issue](https://github.com/yumxiong/rag-kb/issues)。
 
 

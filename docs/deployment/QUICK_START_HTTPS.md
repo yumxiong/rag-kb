@@ -38,8 +38,11 @@ mkcert -version
 - 选择"以管理员身份运行"
 
 ### 第 3 步: 启动服务
+
+先按 [完整设置指南](HTTPS_SETUP_GUIDE.md) 创建并填写 `.env.local-https` 的聊天与嵌入 Key。宿主机 Keyring 不会自动进入容器。80/443 当前绑定所有接口，证书信任和调用流程需实际验证。
+
 ```bash
-make dev-https
+docker compose -f docker/docker-compose.yml -f docker/docker-compose.local-https.yml up -d --build
 ```
 
 ### 第 4 步: 访问

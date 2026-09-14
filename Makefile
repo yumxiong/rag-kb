@@ -20,7 +20,7 @@ help: ## 显示帮助信息
 install: ## 安装项目依赖
 	@echo "$(YELLOW)📦 安装项目依赖...$(NC)"
 	python -m pip install --upgrade pip
-	pip install -r requirements.txt
+	python -m pip install -r requirements.txt -r requirements-frontend.txt
 	mkdir -p data/uploads data/chroma_db logs
 
 test: ## 运行测试

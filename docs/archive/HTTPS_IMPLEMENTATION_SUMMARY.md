@@ -290,7 +290,7 @@ HTTPS 配置已经完全就绪！现在你有：
 
 **准备生产部署？**
 - 运行 `make setup-production-https`
-- 查看 [生产环境文档](../../docker/README.md#4-生产环境部署)
+- 查看 [生产环境文档](../../docker/README.md#生产配置与生成文件)
 
 
 
