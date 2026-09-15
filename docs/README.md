@@ -2,7 +2,7 @@
 
 | 主题 | 主入口 | 补充资料 |
 | --- | --- | --- |
-| 项目与启动 | [项目 README](../README.md) | 配置与启动说明已核对，干净环境复现尚待实测 |
+| 项目与启动 | [项目 README](../README.md) | [真实 RAG 演示](demo.md) |
 | 部署 | [Docker 部署指南](../docker/README.md) | [本地 HTTPS](deployment/HTTPS_SETUP_GUIDE.md)、[故障排除](deployment/HTTPS_TROUBLESHOOTING.md) |
 | 任务取消 | [使用指南](CANCEL_TASK_GUIDE.md) | [快速操作](QUICK_START_CANCEL.md)、[取消任务演示脚本说明](DEMO_SCRIPT.md) |
 | PDF / OCR | [脚本说明](../scripts/README.md) | PDF 调试与 OCR 安装、检查 |

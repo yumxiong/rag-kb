@@ -1,6 +1,16 @@
 # RAG Knowledge Base
 
-[文档导航](docs/README.md) · [部署指南](docker/README.md) · [任务取消](docs/CANCEL_TASK_GUIDE.md)
+一个可复现的中文 RAG 知识库 Demo：上传文档、异步处理、语义检索，并在回答中展示可核对的原文来源。
+
+[![演示](https://img.shields.io/badge/demo-真实问答-blue)](docs/demo.md) [![测试](https://img.shields.io/badge/tests-validated-success)](docs/demo.md#验收范围)
+
+![真实回答与来源](docs/assets/a06-answer-sources.png)
+
+**30 秒了解项目：** 后端是 FastAPI，前端是 Streamlit，向量存储使用 ChromaDB，问答链路使用 LangChain。先看[真实演示](docs/demo.md)，再看[本地启动](#🚀-快速开始)或[部署指南](docker/README.md)。
+
+**当前状态：** A05/A06 的干净环境、真实模型问答和来源展示已验证；公开检索评测仍在人工审核，Docker 镜像构建尚未验收。详见[检索评测状态](#检索评测状态)。
+
+[文档导航](docs/README.md) · [真实演示](docs/demo.md) · [部署指南](docker/README.md) · [任务取消](docs/CANCEL_TASK_GUIDE.md)
 
 一个面向中文与多模型场景的 RAG（Retrieval-Augmented Generation）知识库系统：
 
@@ -58,6 +68,19 @@
 - Secret 文件、环境变量、Keyring 等多种安全配置方式
 
 ## 🏗️ 系统架构
+
+```mermaid
+flowchart LR
+  U[Streamlit 前端] --> A[FastAPI API]
+  A --> P[文档处理与异步任务]
+  P --> V[(ChromaDB 向量库)]
+  A --> V
+  V --> Q[检索与 QAEngine]
+  Q --> L[LLM Provider]
+  A --> S[来源片段与状态展示]
+```
+
+上传路径是“前端 → API → 文档处理 → 向量库”；问答路径是“问题 → 检索 → LLM → 回答与来源”。
 
 ```text
 Streamlit UI
