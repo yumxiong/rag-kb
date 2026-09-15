@@ -53,7 +53,7 @@ def _read_browser_settings() -> Optional[Dict[str, Any]]:
 
     try:
         payload = streamlit_js_eval(
-            """
+            js_expressions="""
             (function(){
               try {
                 const getLS = () => {

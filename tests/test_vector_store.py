@@ -134,6 +134,44 @@ class TestVectorStore:
             with pytest.raises(ValueError, match="API key not configured"):
                 vector_store._initialize_embeddings()
 
+    def test_qwen_compatible_endpoint_receives_text(self, mock_settings):
+        """Qwen must honor its configured endpoint and send text, not token IDs."""
+        from langchain_openai import OpenAIEmbeddings
+
+        mock_settings.get_model_config.return_value = {
+            "embedding_provider": "qwen",
+            "embedding_model": "text-embedding-v3",
+            "embedding_api_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        }
+        VectorStore._instance = None
+        with patch("app.core.vector_store.CachedEmbeddings") as cached:
+            store = VectorStore()
+            store._initialize_embeddings()
+            embeddings = cached.call_args.kwargs["base_embeddings"]
+            assert isinstance(embeddings, OpenAIEmbeddings)
+            client = Mock()
+            client.create.return_value = {"data": [{"embedding": [0.1, 0.2]}]}
+            embeddings.client = client
+            assert embeddings.embed_documents(["导出文件保留七天"]) == [[0.1, 0.2]]
+            assert client.create.call_args.kwargs["input"] == "导出文件保留七天"
+            assert embeddings.openai_api_base == (
+                "https://dashscope.aliyuncs.com/compatible-mode/v1"
+            )
+
+    def test_metadata_then_vector_initialization(self, mock_settings):
+        """Opening admin statistics first must not poison the real Chroma client."""
+        VectorStore._instance = None
+        store = VectorStore()
+        try:
+            store._ensure_chroma_client_only()
+            store._initialize_vectorstore()
+            assert store.vectorstore._collection.count() == 0
+            assert store.chroma_client.get_settings().anonymized_telemetry is False
+        finally:
+            if store.chroma_client is not None:
+                store.chroma_client._system.stop()
+            VectorStore._instance = None
+
     def test_initialize_embeddings_with_custom_base_url(self, mock_settings):
         """测试自定义API端点初始化"""
         VectorStore._instance = None

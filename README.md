@@ -202,7 +202,22 @@ $env:BACKEND_URL_CLIENT = 'http://localhost:8000'
 
 前端地址为 http://localhost:8501，健康接口为 http://localhost:8000/health。健康接口检查配置和目录，不证明模型调用成功。`/docs`、`/redoc`、`/openapi.json` 默认关闭；仅需本地调试时在 `.env` 设置 `ENABLE_API_DOCS=True` 后重启后端。
 
-安装约束和配置已核对；干净环境安装、真实上传和问答仍待实测，不将以上命令视为已完成的端到端复现证据。
+2026-09-14 在 Windows / Python 3.11.5 新建隔离环境完成前后端依赖安装、`pip check` 和本地核心问答验收：虚构 Markdown 上传、真实 Qwen 嵌入入库、DeepSeek 回答及浏览器来源展示均已验证。实际安装发现的兼容问题通过 `chardet<6`、`posthog<6` 约束修复；管理员元数据查询与向量查询的 Chroma 配置已统一，Qwen 使用配置的兼容端点并发送文本。
+
+复现素材：[演示支持政策](docs/examples/demo-support-policy.md)。先按上文配置管理员密码哈希和 JWT 密钥，登录前端 Admin 页，返回主页，从侧栏选择该文件并点击“上传文件”。等待任务完成、知识库显示 1 个文档后，提问“导出文件保留多久？”。本次回答为“导出文件保留七天；超过七天后需要重新申请”，API 和页面参考来源均为 `demo-support-policy.md`。上传成功仅表示进入队列，须另外确认处理完成。
+
+本次非敏感模型配置如下；两个 Key 分别通过安全环境提供，不填写到公开文件中：
+
+```dotenv
+LLM_PROVIDER=deepseek
+CHAT_MODEL=deepseek-flash
+API_BASE_URL=https://api.deepseek.com
+EMBEDDING_PROVIDER=qwen
+EMBEDDING_MODEL=text-embedding-v3
+EMBEDDING_API_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+```
+
+验收使用独立上传、Chroma、缓存及任务目录，后端/前端绑定 `127.0.0.1:18000/18501`，相应调整 `BACKEND_URL`、`BACKEND_URL_CLIENT` 和 CORS。首次 API 回答 `from_cache=false`；随后浏览器展示复用了该真实回答的缓存。专项单测原有 100 项通过，修复后的向量存储专项 32 项通过；这些结果不代表全应用覆盖率验收。Docker 仅完成先前的 Compose 配置解析，未构建镜像；OCR、HTTPS 和生产部署未做本轮端到端验收。本机曾出现内存/线程资源不足及浏览器卡死，释放本轮资源并重启浏览器后完成验收。
 
 ## 🐳 Docker 与 HTTPS
 
