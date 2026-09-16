@@ -5,7 +5,6 @@ from typing import Any, Dict, Optional
 
 import streamlit as st
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -75,7 +74,7 @@ def _read_browser_settings() -> Optional[Dict[str, Any]]:
             })()
             """,
             key="ls_bulk_read",
-            want_output=True
+            want_output=True,
         )
     except Exception as exc:
         logger.warning(f"Failed to read BYOK settings via JS eval: {exc}")
@@ -143,15 +142,17 @@ def _restore_from_url_params() -> bool:
             query_params = st.experimental_get_query_params()
             clear_params = lambda: st.experimental_set_query_params()
 
-        restored_flag = query_params.get('restored')
-        if restored_flag == '1' or (
-            isinstance(restored_flag, list) and restored_flag and restored_flag[0] == '1'
+        restored_flag = query_params.get("restored")
+        if restored_flag == "1" or (
+            isinstance(restored_flag, list)
+            and restored_flag
+            and restored_flag[0] == "1"
         ):
             import base64
 
-            provider_param = query_params.get('provider', 'openai')
-            base_url_param = query_params.get('base_url', '')
-            model_param = query_params.get('model', 'gpt-3.5-turbo')
+            provider_param = query_params.get("provider", "openai")
+            base_url_param = query_params.get("base_url", "")
+            model_param = query_params.get("model", "gpt-3.5-turbo")
 
             def _decode_param(value: Any, fallback: str = "") -> str:
                 if not value:
@@ -160,24 +161,26 @@ def _restore_from_url_params() -> bool:
                 if not raw_value:
                     return fallback
                 try:
-                    return base64.b64decode(raw_value).decode('utf-8') or fallback
+                    return base64.b64decode(raw_value).decode("utf-8") or fallback
                 except Exception:
                     return raw_value or fallback
 
-            provider = provider_param if isinstance(provider_param, str) else provider_param[0]
+            provider = (
+                provider_param if isinstance(provider_param, str) else provider_param[0]
+            )
             base_url = _decode_param(base_url_param)
             model = model_param if isinstance(model_param, str) else model_param[0]
 
-            st.session_state.byok_provider = (provider or 'openai').strip()
+            st.session_state.byok_provider = (provider or "openai").strip()
             st.session_state.byok_base_url = base_url.strip()
-            st.session_state.byok_model = (model or 'gpt-3.5-turbo').strip()
+            st.session_state.byok_model = (model or "gpt-3.5-turbo").strip()
 
             st.session_state.settings_status = SettingsStatus.LOADED.value
             st.session_state.settings_attempts = 0
 
             logger.info(
                 "BYOK settings restored from query params: provider=%s",
-                st.session_state.byok_provider
+                st.session_state.byok_provider,
             )
 
             clear_params()
@@ -193,7 +196,7 @@ def _ensure_session_defaults() -> None:
         "byok_api_key": "",
         "byok_provider": "openai",
         "byok_base_url": "",
-        "byok_model": "gpt-3.5-turbo"
+        "byok_model": "gpt-3.5-turbo",
     }
 
     for key, default_value in defaults.items():
@@ -210,7 +213,7 @@ def load_user_settings() -> None:
     """Unified settings loader with status enum and bounded retries."""
     _ensure_session_defaults()
 
-    skip_restore = st.session_state.pop('skip_restore_once', False)
+    skip_restore = st.session_state.pop("skip_restore_once", False)
 
     if st.session_state.settings_status == SettingsStatus.LOADED.value or skip_restore:
         return
@@ -227,7 +230,7 @@ def load_user_settings() -> None:
     # 3) Fallback via hidden HTML and bounded reruns
     if raw_data is None:
         _load_with_html_fallback()
-        attempts = int(st.session_state.get('settings_attempts', 0))
+        attempts = int(st.session_state.get("settings_attempts", 0))
         if attempts < MAX_ATTEMPTS:
             st.session_state.settings_attempts = attempts + 1
             st.rerun()
@@ -237,9 +240,15 @@ def load_user_settings() -> None:
 
     # Parse and normalize values
     api_key = _normalize_local_storage_value(raw_data.get("api_key_raw"))
-    provider = _normalize_local_storage_value(raw_data.get("provider_raw"), "openai") or "openai"
+    provider = (
+        _normalize_local_storage_value(raw_data.get("provider_raw"), "openai")
+        or "openai"
+    )
     base_url = _normalize_local_storage_value(raw_data.get("base_url_raw"))
-    model = _normalize_local_storage_value(raw_data.get("model_raw"), "gpt-3.5-turbo") or "gpt-3.5-turbo"
+    model = (
+        _normalize_local_storage_value(raw_data.get("model_raw"), "gpt-3.5-turbo")
+        or "gpt-3.5-turbo"
+    )
 
     st.session_state.byok_api_key = api_key
     st.session_state.byok_provider = provider
@@ -252,7 +261,5 @@ def load_user_settings() -> None:
     logger.info(
         "BYOK settings loaded from browser: provider=%s, api_key_exists=%s",
         provider,
-        bool(api_key)
+        bool(api_key),
     )
-
-

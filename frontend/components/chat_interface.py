@@ -1,11 +1,12 @@
 """
 聊天界面组件
 """
-import streamlit as st
-import requests
+
 import time
 from typing import Optional
 
+import requests
+import streamlit as st
 
 MAX_QUESTION_LENGTH = 2000
 DEFAULT_MAX_SOURCES = 3
@@ -14,11 +15,11 @@ MAX_SOURCES_LIMIT = 5
 
 class ChatInterface:
     """聊天界面组件类"""
-    
+
     def __init__(self, backend_url: str, admin_token: Optional[str] = None):
         self.backend_url = backend_url
         self.admin_token = admin_token
-        
+
         # 初始化会话状态
         if "messages" not in st.session_state:
             st.session_state.messages = []
@@ -30,7 +31,7 @@ class ChatInterface:
         # 清空对话时是否重置检索范围（可配置）
         if "reset_scope_on_clear" not in st.session_state:
             st.session_state.reset_scope_on_clear = True
-    
+
     def render(self):
         """渲染聊天界面"""
 
@@ -52,23 +53,23 @@ class ChatInterface:
 
         # 输入区域 + 高级设置
         self._render_input_area()
-    
+
     def _render_chat_history(self):
         """渲染聊天历史"""
-        
+
         # 聊天容器
         chat_container = st.container()
-        
+
         with chat_container:
             # 显示历史消息
             for message in st.session_state.messages:
                 with st.chat_message(message["role"]):
                     st.write(message["content"])
-                    
+
                     # 如果是助手回答，显示来源文档
                     if message["role"] == "assistant" and "sources" in message:
                         self._render_sources(message["sources"])
-    
+
     def _render_sources(self, sources):
         """渲染来源文档 - 优化为卡片式设计"""
         if sources:
@@ -76,7 +77,8 @@ class ChatInterface:
                 for i, source in enumerate(sources, 1):
                     # 使用容器创建卡片效果
                     with st.container():
-                        st.markdown(f"""
+                        st.markdown(
+                            f"""
                         <div style="
                             background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
                             border-left: 4px solid #667eea;
@@ -101,23 +103,32 @@ class ChatInterface:
                                 <strong style="color: #667eea;">{source['document_name']}</strong>
                             </div>
                         </div>
-                        """, unsafe_allow_html=True)
+                        """,
+                            unsafe_allow_html=True,
+                        )
 
                         # 内容预览
-                        content_preview = source['content'][:200] + "..." if len(source['content']) > 200 else source['content']
-                        st.markdown(f"<div style='padding-left: 34px; color: #666; font-size: 0.9em;'>{content_preview}</div>", unsafe_allow_html=True)
+                        content_preview = (
+                            source["content"][:200] + "..."
+                            if len(source["content"]) > 200
+                            else source["content"]
+                        )
+                        st.markdown(
+                            f"<div style='padding-left: 34px; color: #666; font-size: 0.9em;'>{content_preview}</div>",
+                            unsafe_allow_html=True,
+                        )
 
                         # 元数据
-                        if source.get('page_number'):
+                        if source.get("page_number"):
                             st.caption(f"📄 页码: {source['page_number']}")
 
                         # 查看完整内容
-                        if len(source['content']) > 200:
+                        if len(source["content"]) > 200:
                             with st.expander("查看完整内容", expanded=False):
-                                st.text(source['content'])
+                                st.text(source["content"])
 
                         st.markdown("<br>", unsafe_allow_html=True)
-    
+
     def _fetch_suggestions(self):
         """获取问题建议 + 文档数量。"""
         try:
@@ -179,7 +190,9 @@ class ChatInterface:
             cols = st.columns(len(top))
             for i, suggestion in enumerate(top):
                 with cols[i]:
-                    if st.button(suggestion, key=f"suggestion_{i}", use_container_width=True):
+                    if st.button(
+                        suggestion, key=f"suggestion_{i}", use_container_width=True
+                    ):
                         self._process_question(suggestion)
 
     def _fetch_scope_docs(self) -> list:
@@ -188,16 +201,24 @@ class ChatInterface:
         if self.admin_token:
             try:
                 headers = {"Authorization": f"Bearer {self.admin_token}"}
-                resp = requests.get(f"{self.backend_url}/api/documents/", headers=headers, timeout=5)
+                resp = requests.get(
+                    f"{self.backend_url}/api/documents/", headers=headers, timeout=5
+                )
                 if resp.status_code == 200:
                     docs = resp.json() or []
-                    return [{"id": d.get("id"), "filename": d.get("filename", "")} for d in docs]
+                    return [
+                        {"id": d.get("id"), "filename": d.get("filename", "")}
+                        for d in docs
+                    ]
             except Exception:
                 pass
         # 访客：只能看到 filename（无法切换检索范围），返回空列表 -> 仅显示"全库"
         try:
             lib = st.session_state.get("_public_library") or {}
-            return [{"id": None, "filename": d.get("filename", "")} for d in (lib.get("documents") or [])]
+            return [
+                {"id": None, "filename": d.get("filename", "")}
+                for d in (lib.get("documents") or [])
+            ]
         except Exception:
             return []
 
@@ -270,7 +291,7 @@ class ChatInterface:
                 st.session_state.reset_scope_on_clear = reset_scope
 
         st.caption(f"问题长度上限：{MAX_QUESTION_LENGTH} 字符")
-    
+
     def _validate_question(self, question: str) -> Optional[str]:
         """验证问题长度"""
         normalized_question = question.strip()
@@ -281,185 +302,195 @@ class ChatInterface:
             st.warning(f"⚠️ 问题长度不能超过{MAX_QUESTION_LENGTH}字符，请精简后重试")
             return None
         return normalized_question
-    
+
     def _process_question(self, question: str):
         """处理用户问题"""
-        
+
         validated_question = self._validate_question(question)
-        if  validated_question is None:
+        if validated_question is None:
             return
 
-        st.session_state.messages.append({
-            "role": "user",
-            "content": question
-        })
-        
-                
+        st.session_state.messages.append({"role": "user", "content": question})
+
         # 显示用户消息
         with st.chat_message("user"):
             st.write(validated_question)
-        
+
         # 设置处理状态
         st.session_state.is_processing = True
-        
+
         # 显示助手思考中
         with st.chat_message("assistant"):
             with st.spinner("正在思考中..."):
                 try:
                     # 调用问答API
-                    max_sources = getattr(st.session_state, 'max_sources', DEFAULT_MAX_SOURCES)
-                    
+                    max_sources = getattr(
+                        st.session_state, "max_sources", DEFAULT_MAX_SOURCES
+                    )
+
                     response = requests.post(
                         f"{self.backend_url}/api/qa/ask",
                         json=(
-                            (lambda payload: (
-                                payload.update({"document_id": st.session_state.selected_doc_id})
-                                if st.session_state.get("selected_doc_id") else None,
-                                payload
-                            ))({
-                                "question": validated_question,
-                                "max_sources": max_sources
-                            })[1]
+                            (
+                                lambda payload: (
+                                    (
+                                        payload.update(
+                                            {
+                                                "document_id": st.session_state.selected_doc_id
+                                            }
+                                        )
+                                        if st.session_state.get("selected_doc_id")
+                                        else None
+                                    ),
+                                    payload,
+                                )
+                            )(
+                                {
+                                    "question": validated_question,
+                                    "max_sources": max_sources,
+                                }
+                            )[
+                                1
+                            ]
                         ),
                         headers=self._build_byok_headers(),
-                        timeout=30
+                        timeout=30,
                     )
-                    
+
                     if response.status_code == 200:
                         result = response.json()
                         answer = result.get("answer", "抱歉，我无法回答这个问题。")
                         sources = result.get("sources", [])
                         processing_time = result.get("processing_time", 0)
-                        
+
                         # 显示答案
                         st.write(answer)
-                        
+
                         # 显示处理时间
                         st.caption(f"⏱️ 处理时间: {processing_time:.2f}秒")
-                        
+
                         # 显示来源
                         self._render_sources(sources)
-                        
+
                         # 添加助手消息到历史
-                        st.session_state.messages.append({
-                            "role": "assistant",
-                            "content": answer,
-                            "sources": sources,
-                            "processing_time": processing_time
-                        })
-                        
+                        st.session_state.messages.append(
+                            {
+                                "role": "assistant",
+                                "content": answer,
+                                "sources": sources,
+                                "processing_time": processing_time,
+                            }
+                        )
+
                         # 反馈按钮
                         self._render_feedback(question, answer)
-                        
+
                     else:
                         error_detail = response.json().get("detail", "未知错误")
                         error_msg = f"❌ 处理问题时出错: {error_detail}"
                         st.error(error_msg)
-                        
-                        st.session_state.messages.append({
-                            "role": "assistant",
-                            "content": error_msg
-                        })
-                    
+
+                        st.session_state.messages.append(
+                            {"role": "assistant", "content": error_msg}
+                        )
+
                 except requests.exceptions.Timeout:
                     timeout_msg = "❌ 请求超时，请稍后重试"
                     st.error(timeout_msg)
-                    st.session_state.messages.append({
-                        "role": "assistant",
-                        "content": timeout_msg
-                    })
-                    
+                    st.session_state.messages.append(
+                        {"role": "assistant", "content": timeout_msg}
+                    )
+
                 except Exception as e:
                     error_msg = f"❌ 发生错误: {str(e)}"
                     st.error(error_msg)
-                    st.session_state.messages.append({
-                        "role": "assistant",
-                        "content": error_msg
-                    })
-                
+                    st.session_state.messages.append(
+                        {"role": "assistant", "content": error_msg}
+                    )
+
                 finally:
                     # 重置处理状态
                     st.session_state.is_processing = False
-        
+
         # 刷新页面以显示新消息
         st.rerun()
-    
+
     def _render_feedback(self, question: str, answer: str):
         """渲染反馈区域"""
-        
+
         st.write("**这个回答有帮助吗？**")
-        
+
         col1, col2, col3, col4, col5 = st.columns(5)
-        
+
         feedback_given = False
-        
+
         with col1:
             if st.button("⭐", key=f"feedback_1_{len(st.session_state.messages)}"):
                 self._submit_feedback(question, answer, 1)
                 feedback_given = True
-        
+
         with col2:
             if st.button("⭐⭐", key=f"feedback_2_{len(st.session_state.messages)}"):
                 self._submit_feedback(question, answer, 2)
                 feedback_given = True
-        
+
         with col3:
             if st.button("⭐⭐⭐", key=f"feedback_3_{len(st.session_state.messages)}"):
                 self._submit_feedback(question, answer, 3)
                 feedback_given = True
-        
+
         with col4:
-            if st.button("⭐⭐⭐⭐", key=f"feedback_4_{len(st.session_state.messages)}"):
+            if st.button(
+                "⭐⭐⭐⭐", key=f"feedback_4_{len(st.session_state.messages)}"
+            ):
                 self._submit_feedback(question, answer, 4)
                 feedback_given = True
-        
+
         with col5:
-            if st.button("⭐⭐⭐⭐⭐", key=f"feedback_5_{len(st.session_state.messages)}"):
+            if st.button(
+                "⭐⭐⭐⭐⭐", key=f"feedback_5_{len(st.session_state.messages)}"
+            ):
                 self._submit_feedback(question, answer, 5)
                 feedback_given = True
-        
+
         if feedback_given:
             st.success("感谢您的反馈！")
-    
+
     def _submit_feedback(self, question: str, answer: str, rating: int):
         """提交用户反馈"""
         try:
             requests.post(
                 f"{self.backend_url}/api/qa/feedback",
-                json={
-                    "question": question,
-                    "answer": answer,
-                    "rating": rating
-                },
-                timeout=10
+                json={"question": question, "answer": answer, "rating": rating},
+                timeout=10,
             )
         except Exception as e:
             st.error(f"反馈提交失败: {str(e)}")
-    
+
     def _build_byok_headers(self) -> dict:
         """根据侧边栏保存的 BYOK 设置构建请求头（仅保存在本地会话）"""
         headers = {}
         try:
-            api_key = getattr(st.session_state, 'byok_api_key', '').strip()
-            provider = getattr(st.session_state, 'byok_provider', '').strip()
-            base_url = getattr(st.session_state, 'byok_base_url', '').strip()
-            model = getattr(st.session_state, 'byok_model', '').strip()
+            api_key = getattr(st.session_state, "byok_api_key", "").strip()
+            provider = getattr(st.session_state, "byok_provider", "").strip()
+            base_url = getattr(st.session_state, "byok_base_url", "").strip()
+            model = getattr(st.session_state, "byok_model", "").strip()
             if api_key:
-                headers['LLM-Api-Key'] = api_key
+                headers["LLM-Api-Key"] = api_key
             if provider:
-                headers['LLM-Provider'] = provider
+                headers["LLM-Provider"] = provider
             if base_url:
-                headers['LLM-Base-URL'] = base_url
+                headers["LLM-Base-URL"] = base_url
             if model:
-                headers['LLM-Model'] = model
+                headers["LLM-Model"] = model
         except Exception:
             pass
         return headers
-    
+
     def get_chat_history(self):
         """获取聊天历史"""
         return st.session_state.messages
-    
+
     def clear_chat_history(self):
         """清空聊天历史"""
         st.session_state.messages = []

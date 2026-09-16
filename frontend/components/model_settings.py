@@ -2,19 +2,23 @@
 模型设置组件
 负责BYOK (Bring Your Own Key) 配置界面
 """
-import streamlit as st
-import streamlit.components.v1 as components
+
 import json
 import logging
 from datetime import datetime
-from typing import Dict, Any
-from utils.settings_loader import load_user_settings as load_user_settings_shared, SettingsStatus
+from typing import Any, Dict
+
+import streamlit as st
+import streamlit.components.v1 as components
+from utils.settings_loader import SettingsStatus
+from utils.settings_loader import load_user_settings as load_user_settings_shared
 
 logger = logging.getLogger(__name__)
 
 # 尝试导入streamlit-js-eval，如果没有则使用备用方案
 try:
     from streamlit_js_eval import streamlit_js_eval
+
     JS_EVAL_AVAILABLE = True
 except ImportError:
     JS_EVAL_AVAILABLE = False
@@ -29,13 +33,13 @@ class ModelSettingsComponent:
             "openai": "gpt-3.5-turbo",
             "deepseek": "deepseek-chat",
             "zhipu": "glm-4",
-            "custom": "gpt-3.5-turbo"
+            "custom": "gpt-3.5-turbo",
         }
         self.default_base_urls = {
             "openai": "",
             "deepseek": "https://api.deepseek.com",
             "zhipu": "https://open.bigmodel.cn/api/paas/v4",
-            "custom": ""
+            "custom": "",
         }
 
     def detect_provider_from_api_key(self, api_key: str) -> str:
@@ -115,7 +119,7 @@ class ModelSettingsComponent:
                 })()
                 """,
                 key="ls_bulk_read",
-                want_output=True
+                want_output=True,
             )
 
             if not payload or not isinstance(payload, str):
@@ -178,10 +182,10 @@ class ModelSettingsComponent:
 
     def save_user_settings(self):
         """保存用户设置到浏览器localStorage"""
-        api_key = st.session_state.get('byok_api_key', '')
-        provider = st.session_state.get('byok_provider', 'openai')
-        base_url = st.session_state.get('byok_base_url', '')
-        model = st.session_state.get('byok_model', 'gpt-3.5-turbo')
+        api_key = st.session_state.get("byok_api_key", "")
+        provider = st.session_state.get("byok_provider", "openai")
+        base_url = st.session_state.get("byok_base_url", "")
+        model = st.session_state.get("byok_model", "gpt-3.5-turbo")
 
         timestamp = datetime.utcnow().isoformat()
 
@@ -198,17 +202,19 @@ class ModelSettingsComponent:
             provider=json.dumps(provider),
             base_url=json.dumps(base_url),
             model=json.dumps(model),
-            timestamp=json.dumps(timestamp)
+            timestamp=json.dumps(timestamp),
         )
 
         if JS_EVAL_AVAILABLE:
             try:
                 streamlit_js_eval(
-                    js_expressions=js_expr,
-                    key="save_ls_byok",
-                    want_output=False
+                    js_expressions=js_expr, key="save_ls_byok", want_output=False
                 )
-                logger.info("BYOK settings saved via JS eval: provider=%s, api_key_exists=%s", provider, bool(api_key))
+                logger.info(
+                    "BYOK settings saved via JS eval: provider=%s, api_key_exists=%s",
+                    provider,
+                    bool(api_key),
+                )
                 return
             except Exception as exc:
                 logger.warning(f"JS-eval save failed, fallback to HTML: {exc}")
@@ -226,15 +232,20 @@ class ModelSettingsComponent:
             </script>
             """,
             height=0,
-            width=0
+            width=0,
         )
-        logger.info("BYOK settings saved via HTML fallback: provider=%s, api_key_exists=%s", provider, bool(api_key))
+        logger.info(
+            "BYOK settings saved via HTML fallback: provider=%s, api_key_exists=%s",
+            provider,
+            bool(api_key),
+        )
 
     def clear_user_settings(self):
         """清除用户设置"""
         if JS_EVAL_AVAILABLE:
             try:
                 import time
+
                 js_code = """
                 (function(){
                   try{
@@ -249,7 +260,7 @@ class ModelSettingsComponent:
                 streamlit_js_eval(
                     js_expressions=js_code,
                     key=f"clear_all_settings_{int(time.time()*1000)}",
-                    want_output=False
+                    want_output=False,
                 )
             except Exception as e:
                 logger.warning(f"清除设置时出错: {e}")
@@ -269,15 +280,12 @@ class ModelSettingsComponent:
             """
             components.html(clear_js, height=0, width=0)
 
-    
     def render(self):
         """渲染模型设置组件"""
         st.header("🔑 模型设置 (BYOK)")
 
-        api_key_configured = bool(st.session_state.get('byok_api_key'))
+        api_key_configured = bool(st.session_state.get("byok_api_key"))
         st.caption(f"API Key：{'已配置' if api_key_configured else '未配置'}")
-
-        
 
         # 设置表单
         with st.form("byok_form"):
@@ -285,50 +293,62 @@ class ModelSettingsComponent:
                 "API Key",
                 type="password",
                 value=st.session_state.byok_api_key,
-                help="设置将保存在浏览器本地，刷新页面不会丢失"
+                help="设置将保存在浏览器本地，刷新页面不会丢失",
             )
 
             # Auto-detect provider based on API key format
-            detected_provider = self.detect_provider_from_api_key(api_key) if api_key else st.session_state.byok_provider
+            detected_provider = (
+                self.detect_provider_from_api_key(api_key)
+                if api_key
+                else st.session_state.byok_provider
+            )
             current_provider = st.session_state.byok_provider
 
             # Show detected provider hint
             if api_key and detected_provider != current_provider:
-                st.info(f"💡 检测到 API Key 格式，建议选择提供商: **{detected_provider}**")
+                st.info(
+                    f"💡 检测到 API Key 格式，建议选择提供商: **{detected_provider}**"
+                )
 
             provider = st.selectbox(
                 "提供商",
                 options=self.provider_options,
-                index=self.provider_options.index(current_provider)
+                index=self.provider_options.index(current_provider),
             )
 
             base_url = st.text_input(
                 "Base URL (可选)",
                 value=st.session_state.byok_base_url,
-                placeholder="如自定义兼容 OpenAI 的网关地址"
+                placeholder="如自定义兼容 OpenAI 的网关地址",
             )
 
             model = st.text_input(
                 "模型 (可选)",
                 value=st.session_state.byok_model,
-                placeholder="如 gpt-4o-mini / deepseek-chat / glm-4"
+                placeholder="如 gpt-4o-mini / deepseek-chat / glm-4",
             )
 
             col1, col2, col3 = st.columns([1, 1, 1])
             with col1:
                 saved = st.form_submit_button(
                     "💾 保存设置",
-                    on_click=lambda: st.session_state.__setitem__('skip_restore_once', True)
+                    on_click=lambda: st.session_state.__setitem__(
+                        "skip_restore_once", True
+                    ),
                 )
             with col2:
                 auto_detect = st.form_submit_button(
                     "🎯 自动检测",
-                    on_click=lambda: st.session_state.__setitem__('skip_restore_once', True)
+                    on_click=lambda: st.session_state.__setitem__(
+                        "skip_restore_once", True
+                    ),
                 )
             with col3:
                 cleared = st.form_submit_button(
                     "🗑️ 清除设置",
-                    on_click=lambda: st.session_state.__setitem__('skip_restore_once', True)
+                    on_click=lambda: st.session_state.__setitem__(
+                        "skip_restore_once", True
+                    ),
                 )
 
             # 处理按钮点击事件
@@ -356,7 +376,9 @@ class ModelSettingsComponent:
         st.success(f"✅ 已自动检测并配置为 {detected} 提供商")
         st.rerun()
 
-    def _handle_save_settings(self, api_key: str, provider: str, base_url: str, model: str):
+    def _handle_save_settings(
+        self, api_key: str, provider: str, base_url: str, model: str
+    ):
         """处理保存设置按钮点击"""
         st.session_state.byok_api_key = api_key.strip()
         st.session_state.byok_provider = provider.strip()
@@ -382,18 +404,18 @@ class ModelSettingsComponent:
     def build_byok_headers(self) -> Dict[str, str]:
         """根据当前会话中的 BYOK 设置构造请求头"""
         headers = {}
-        api_key = st.session_state.get('byok_api_key', '').strip()
-        provider = st.session_state.get('byok_provider', '').strip()
-        base_url = st.session_state.get('byok_base_url', '').strip()
-        model = st.session_state.get('byok_model', '').strip()
+        api_key = st.session_state.get("byok_api_key", "").strip()
+        provider = st.session_state.get("byok_provider", "").strip()
+        base_url = st.session_state.get("byok_base_url", "").strip()
+        model = st.session_state.get("byok_model", "").strip()
 
         if api_key:
-            headers['LLM-Api-Key'] = api_key
+            headers["LLM-Api-Key"] = api_key
         if provider:
-            headers['LLM-Provider'] = provider
+            headers["LLM-Provider"] = provider
         if base_url:
-            headers['LLM-Base-URL'] = base_url
+            headers["LLM-Base-URL"] = base_url
         if model:
-            headers['LLM-Model'] = model
+            headers["LLM-Model"] = model
 
         return headers

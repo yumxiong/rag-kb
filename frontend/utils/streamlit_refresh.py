@@ -2,9 +2,11 @@
 Streamlit原生刷新方案
 使用Streamlit内置机制实现可靠的自动刷新
 """
-import streamlit as st
-import time
+
 import threading
+import time
+
+import streamlit as st
 
 
 def setup_streamlit_auto_refresh(job_id: str, client_url: str, mode: str):
@@ -56,21 +58,23 @@ def check_document_status(job_id: str, client_url: str, status_placeholder):
     import requests
 
     try:
-        response = requests.get(f"{client_url}/api/documents/status/{job_id}", timeout=10)
+        response = requests.get(
+            f"{client_url}/api/documents/status/{job_id}", timeout=10
+        )
         if response.status_code == 200:
             result = response.json()
-            status = result.get('status', 'unknown')
+            status = result.get("status", "unknown")
 
-            if status == 'completed':
+            if status == "completed":
                 return True
-            elif status == 'failed':
-                error = result.get('error', '未知错误')
+            elif status == "failed":
+                error = result.get("error", "未知错误")
                 status_placeholder.error(f"❌ 处理失败: {error}")
                 return True  # 虽然失败，但处理已结束
-            elif status == 'processing':
-                progress = result.get('progress', 0)
-                stage = result.get('stage', '')
-                message = result.get('message', '')
+            elif status == "processing":
+                progress = result.get("progress", 0)
+                stage = result.get("stage", "")
+                message = result.get("message", "")
 
                 status_text = get_processing_status_text(stage, progress, message)
                 status_placeholder.info(status_text)
@@ -89,22 +93,22 @@ def check_document_status(job_id: str, client_url: str, status_placeholder):
 
 def get_processing_status_text(stage: str, progress: int, message: str) -> str:
     """获取处理状态文本"""
-    if 'ocr' in stage.lower():
-        base_text = '🔍 OCR文字识别中'
-    elif 'split' in stage.lower() or 'chunk' in stage.lower():
-        base_text = '📄 文档分割中'
-    elif 'embed' in stage.lower():
-        base_text = '🧠 生成向量嵌入中'
-    elif 'save' in stage.lower():
-        base_text = '💾 保存到数据库中'
+    if "ocr" in stage.lower():
+        base_text = "🔍 OCR文字识别中"
+    elif "split" in stage.lower() or "chunk" in stage.lower():
+        base_text = "📄 文档分割中"
+    elif "embed" in stage.lower():
+        base_text = "🧠 生成向量嵌入中"
+    elif "save" in stage.lower():
+        base_text = "💾 保存到数据库中"
     else:
-        base_text = '🔄 处理中'
+        base_text = "🔄 处理中"
 
     if progress > 0:
-        base_text += f' ({progress}%)'
+        base_text += f" ({progress}%)"
 
     if message:
-        base_text += f' - {message}'
+        base_text += f" - {message}"
 
     return base_text
 
@@ -139,7 +143,7 @@ def add_simple_refresh_buttons():
         if st.button("🔄 刷新统计", help="刷新文档统计信息"):
             # 清除缓存并刷新
             for key in list(st.session_state.keys()):
-                if key.endswith('_cache'):
+                if key.endswith("_cache"):
                     del st.session_state[key]
             st.rerun()
 
@@ -147,7 +151,7 @@ def add_simple_refresh_buttons():
         if st.button("🔄 刷新列表", help="刷新文档列表"):
             # 清除缓存并刷新
             for key in list(st.session_state.keys()):
-                if key.endswith('_cache'):
+                if key.endswith("_cache"):
                     del st.session_state[key]
             st.rerun()
 

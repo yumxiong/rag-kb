@@ -2,11 +2,11 @@
 
 一个可复现的中文 RAG 知识库 Demo：上传文档、异步处理、语义检索，并在回答中展示可核对的原文来源。
 
-[![演示](https://img.shields.io/badge/demo-真实问答-blue)](docs/demo.md) [![测试](https://img.shields.io/badge/tests-validated-success)](docs/demo.md#验收范围)
+[真实演示](docs/demo.md) · [本地启动](#quick-start) · [评测状态](docs/evaluation.md)
 
 ![真实回答与来源](docs/assets/a06-answer-sources.png)
 
-**30 秒了解项目：** 后端是 FastAPI，前端是 Streamlit，向量存储使用 ChromaDB，问答链路使用 LangChain。先看[真实演示](docs/demo.md)，再看[本地启动](#🚀-快速开始)或[部署指南](docker/README.md)。
+后端是 FastAPI，前端是 Streamlit，向量存储使用 ChromaDB，问答链路使用 LangChain。先看[真实演示](docs/demo.md)，再看[本地启动](#quick-start)或[部署指南](docker/README.md)。
 
 **当前状态：** A05/A06 的干净环境、真实模型问答和来源展示已验证；公开检索评测仍在人工审核，Docker 镜像构建尚未验收。详见[检索评测状态](#检索评测状态)。
 
@@ -19,7 +19,15 @@
 - 底层使用 **ChromaDB + LangChain** 构建向量检索与问答链路
 - 支持 **OpenAI / DeepSeek / Zhipu / Qwen / OpenAI-compatible** 多种接入方式
 
-它不仅是一个“能跑起来”的 RAG Demo，也包含了不少更贴近真实产品环境的能力：**异步文档处理、实时状态更新、任务取消、扫描版 PDF OCR、BYOK、自定义配额、缓存节流、管理员控制台、Docker/HTTPS 部署**。
+代码还包含任务取消、OCR、BYOK、配额、缓存和 Docker/HTTPS 配置；这些功能的实现范围与实际验证范围不同，见文末限制。
+
+| 工程能力 | 实现入口 | 验证范围 |
+| --- | --- | --- |
+| 异步上传与任务状态 | [处理器](app/core/async_processor.py)、[上传 API](app/api/documents.py) | 演示 Markdown 异步入库通过 |
+| 检索生成与原文来源 | [问答引擎](app/core/qa_engine.py) | 真实模型回答及页面来源通过 |
+| 聊天与嵌入配置分离 | [配置](app/core/config.py)、[向量存储](app/core/vector_store.py) | DeepSeek 聊天 + Qwen 嵌入通过 |
+| 嵌入与问答缓存 | [缓存管理](app/core/cache_manager.py) | 首次真实回答、后续缓存展示通过 |
+| 配额与管理员鉴权 | [配额管理](app/core/quota_manager.py)、[鉴权](app/api/auth.py) | 专项测试及演示管理员登录通过 |
 
 ## ✨ 核心能力
 
@@ -73,11 +81,13 @@
 flowchart LR
   U[Streamlit 前端] --> A[FastAPI API]
   A --> P[文档处理与异步任务]
-  P --> V[(ChromaDB 向量库)]
-  A --> V
-  V --> Q[检索与 QAEngine]
+  P --> E[Embedding Provider]
+  E --> V[(ChromaDB 向量库)]
+  A --> Q[检索与 QAEngine]
+  Q --> E
+  V --> Q
   Q --> L[LLM Provider]
-  A --> S[来源片段与状态展示]
+  L --> S[回答与来源展示]
 ```
 
 上传路径是“前端 → API → 文档处理 → 向量库”；问答路径是“问题 → 检索 → LLM → 回答与来源”。
@@ -149,6 +159,8 @@ data/            # 上传文件、向量库、配额、任务状态
 secrets/         # 本地 secret 文件（请勿提交）
 ```
 
+<a id="quick-start"></a>
+
 ## 🚀 快速开始
 
 ### 1) 环境要求
@@ -191,7 +203,7 @@ New-Item -ItemType Directory -Force data/uploads,data/chroma_db,data/job_status,
 
 仅首次配置时复制模板；已有 `.env` 时直接编辑。模板不含有效密钥。填写匹配聊天提供商的 `API_KEY`（默认 OpenAI 也可用 `OPENAI_API_KEY`），并为文档入库和检索配置 `EMBEDDING_API_KEY`。同一提供商可使用同一个有效 Key；不同提供商须分别填写。只有前端 BYOK 聊天 Key 不能替代服务端 Embedding Key。
 
-管理员页面另需 `JWT_SECRET` 和 `ADMIN_PASSWORD_HASH`，可用 `python scripts/generate_admin_hash.py` 生成密码哈希；未配置时管理员登录不可用。普通上传/问答不要求启用管理员功能。更多信息见 [模型配置](SETUP_API_KEY.md) 和 [安全指南](SECURITY.md)。
+上传文档需要管理员登录。配置 `JWT_SECRET` 和 `ADMIN_PASSWORD_HASH`，可用 `python scripts/generate_admin_hash.py` 生成密码哈希；未配置时管理员登录不可用。访客可对已入库文档直接提问。更多信息见 [模型配置](SETUP_API_KEY.md) 和 [安全指南](SECURITY.md)。
 
 ### 4) 分别启动后端与前端
 
@@ -488,7 +500,15 @@ make test
 
 ## 检索评测状态
 
-当前分支保留评测工具和离线测试；私人旧题集及旧成绩已移出当前跟踪范围。公开语料和题集仍在独立人工审核，本分支尚无公开、可复现的检索基线，也未完成正式 30 题评测。参见 [评测工具说明](eval/README.md)。专项测试通过不代表检索成绩或全应用覆盖率通过。
+当前分支保留评测工具和离线测试；私人旧题集及旧成绩已移出当前跟踪范围。公开语料和题集仍在独立人工审核，本分支尚无公开、可复现的检索基线，也未完成正式 30 题评测。参见[评测状态](docs/evaluation.md)和[评测工具说明](eval/README.md)。专项测试通过不代表检索成绩。
+
+## 验证状态与已知限制
+
+2026-09-15 本地 Windows / Python 3.11.5 执行 `make format`、`make lint`、`make test`：336 项测试通过，`app/` 覆盖率 70.95%，达到 70% 门槛。该结果不包含前端覆盖率，也不替代 GitHub Linux CI 的发布前检查。
+
+真实问答证据限于一份虚构 Markdown 和指定问题，不代表任意知识库的答案准确率。演示资料中的“文件保留七天”是虚构服务政策，应用本身未实现这项导出保留策略。当前应用采用检索生成流程，未实现 Agent 规划或工具编排。
+
+Docker 镜像构建、OCR、HTTPS 和生产部署未完成本轮端到端验收；公开检索基线等待语料与题集人工审核。下一阶段发布前还需确认远端 CI、仓库入口和许可事项。
 
 ## 📄 License
 

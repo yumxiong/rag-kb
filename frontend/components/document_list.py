@@ -2,12 +2,14 @@
 文档列表组件 - 支持动态刷新
 负责显示已上传的文档列表，提供文档操作功能
 """
-import streamlit as st
-import requests
-import time
+
 import logging
-from typing import List, Dict, Any
-from utils.state_manager import StateManager, AutoRefreshMixin
+import time
+from typing import Any, Dict, List
+
+import requests
+import streamlit as st
+from utils.state_manager import AutoRefreshMixin, StateManager
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +47,9 @@ class DocumentListComponent(AutoRefreshMixin):
         # 检查是否需要刷新数据
         if self.should_refresh_data():
             try:
-                docs_response = requests.get(f"{self.backend_url_internal}/api/documents/")
+                docs_response = requests.get(
+                    f"{self.backend_url_internal}/api/documents/"
+                )
                 if docs_response.status_code == 200:
                     documents = docs_response.json()
                     self.set_cached_data(documents)
@@ -91,14 +95,14 @@ class DocumentListComponent(AutoRefreshMixin):
         """渲染文档操作按钮"""
         # 基于此文档提问按钮
         if st.button("🎯 基于此文档提问", key=f"focus_{doc['id']}"):
-            st.session_state.selected_doc_id = doc['id']
+            st.session_state.selected_doc_id = doc["id"]
             st.success("已限定检索范围到该文档。回到上方聊天区继续提问。")
             time.sleep(1)
             st.rerun()
 
         # 删除按钮
         if st.button(f"🗑️ 删除", key=f"delete_{doc['id']}"):
-            if self._delete_document(doc['id']):
+            if self._delete_document(doc["id"]):
                 st.success("文档删除成功!")
                 time.sleep(1)
                 st.rerun()

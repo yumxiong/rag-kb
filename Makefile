@@ -1,6 +1,6 @@
 # Makefile for RAG Knowledge Base
 
-.PHONY: help install test lint format clean build run stop docker-build docker-run docker-stop
+.PHONY: help install test lint format check-docs clean build run stop docker-build docker-run docker-stop
 
 # 默认目标
 .DEFAULT_GOAL := help
@@ -34,12 +34,15 @@ test-html: ## 运行测试并生成HTML覆盖率报告
 
 lint: ## 代码检查
 	@echo "$(YELLOW)🔍 运行代码检查...$(NC)"
-	flake8 app/ tests/ --max-line-length=88 --extend-ignore=E203,W503
+	flake8 app/ tests/ scripts/check_docs.py --max-line-length=88 --extend-ignore=E203,W503
 
 format: ## 格式化代码
 	@echo "$(YELLOW)✨ 格式化代码...$(NC)"
-	black app/ tests/ frontend/
-	isort app/ tests/ frontend/
+	black app/ tests/ frontend/ scripts/check_docs.py
+	isort app/ tests/ frontend/ scripts/check_docs.py
+
+check-docs: ## 检查公开Markdown相对链接和标题锚点
+	python scripts/check_docs.py
 
 clean: ## 清理缓存和临时文件
 	@echo "$(YELLOW)🧹 清理缓存文件...$(NC)"
@@ -77,7 +80,7 @@ setup-secrets: ## 设置Docker secrets
 
 check-security: ## 检查安全配置
 	@echo "$(YELLOW)🔍 检查安全配置...$(NC)"
-	@python -c "from app.core.config import settings; key=settings.get_openai_api_key(); print('✅ API Key已配置' if key else '❌ API Key未配置')"
+	@python -c "from app.core.config import settings; key=settings.get_api_key(); print('API Key configured' if key else 'API Key not configured')"
 
 check-public-ports: ## 检查8000/8501端口是否被公网发布
 	@echo "$(YELLOW)🔍 检查8000/8501端口是否被公网发布...$(NC)"

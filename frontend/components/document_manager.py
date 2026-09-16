@@ -2,12 +2,14 @@
 文档管理组件 - 支持动态刷新
 负责文档上传、统计信息显示和配额信息展示
 """
-import streamlit as st
-import requests
+
 import logging
-from typing import Dict, Any
-from utils.state_manager import StateManager, AutoRefreshMixin
+from typing import Any, Dict
+
+import requests
+import streamlit as st
 from utils.settings_loader import SettingsStatus
+from utils.state_manager import AutoRefreshMixin, StateManager
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +44,10 @@ class DocumentManagerComponent(AutoRefreshMixin):
         """渲染文件上传组件"""
         # 使用现有的FileUploadComponent
         from components.file_upload import FileUploadComponent
-        file_upload_component = FileUploadComponent(self.backend_url_internal, self.backend_url_client)
+
+        file_upload_component = FileUploadComponent(
+            self.backend_url_internal, self.backend_url_client
+        )
         file_upload_component.render()
 
     def _render_statistics(self):
@@ -62,7 +67,9 @@ class DocumentManagerComponent(AutoRefreshMixin):
         stats = None
         if self.should_refresh_data():
             try:
-                stats_response = requests.get(f"{self.backend_url_internal}/api/documents/stats/overview")
+                stats_response = requests.get(
+                    f"{self.backend_url_internal}/api/documents/stats/overview"
+                )
                 if stats_response.status_code == 200:
                     stats = stats_response.json()
                     self.set_cached_data(stats)
@@ -94,7 +101,10 @@ class DocumentManagerComponent(AutoRefreshMixin):
         """渲染配额信息"""
         st.subheader("📊 使用配额")
         try:
-            if st.session_state.get("settings_status") == SettingsStatus.RESTORING.value:
+            if (
+                st.session_state.get("settings_status")
+                == SettingsStatus.RESTORING.value
+            ):
                 st.info("正在从浏览器恢复设置…")
             else:
                 # 有自定义Key：直接提示无限制
@@ -104,8 +114,7 @@ class DocumentManagerComponent(AutoRefreshMixin):
                     # 无自定义Key：查询后端配额
                     headers = self._build_byok_headers()
                     quota_response = requests.get(
-                        f"{self.backend_url_internal}/api/qa/quota",
-                        headers=headers
+                        f"{self.backend_url_internal}/api/qa/quota", headers=headers
                     )
                     if quota_response.status_code == 200:
                         qi = quota_response.json()
@@ -138,18 +147,18 @@ class DocumentManagerComponent(AutoRefreshMixin):
     def _build_byok_headers(self) -> Dict[str, str]:
         """构建BYOK请求头"""
         headers = {}
-        api_key = st.session_state.get('byok_api_key', '').strip()
-        provider = st.session_state.get('byok_provider', '').strip()
-        base_url = st.session_state.get('byok_base_url', '').strip()
-        model = st.session_state.get('byok_model', '').strip()
+        api_key = st.session_state.get("byok_api_key", "").strip()
+        provider = st.session_state.get("byok_provider", "").strip()
+        base_url = st.session_state.get("byok_base_url", "").strip()
+        model = st.session_state.get("byok_model", "").strip()
 
         if api_key:
-            headers['LLM-Api-Key'] = api_key
+            headers["LLM-Api-Key"] = api_key
         if provider:
-            headers['LLM-Provider'] = provider
+            headers["LLM-Provider"] = provider
         if base_url:
-            headers['LLM-Base-URL'] = base_url
+            headers["LLM-Base-URL"] = base_url
         if model:
-            headers['LLM-Model'] = model
+            headers["LLM-Model"] = model
 
         return headers

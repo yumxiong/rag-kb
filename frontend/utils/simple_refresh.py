@@ -2,8 +2,10 @@
 简单自动刷新方案
 提供多种刷新方式供用户选择
 """
-import streamlit as st
+
 import time
+
+import streamlit as st
 
 
 def add_auto_refresh_option():
@@ -17,10 +19,10 @@ def add_auto_refresh_option():
                 "手动刷新（默认）",
                 "10秒后自动刷新",
                 "30秒后自动刷新",
-                "处理完成立即刷新页面"
+                "处理完成立即刷新页面",
             ],
             index=0,
-            key="refresh_mode"
+            key="refresh_mode",
         )
 
         if refresh_mode != "手动刷新（默认）":

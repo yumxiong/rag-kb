@@ -141,7 +141,9 @@ class TestVectorStore:
         mock_settings.get_model_config.return_value = {
             "embedding_provider": "qwen",
             "embedding_model": "text-embedding-v3",
-            "embedding_api_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "embedding_api_base_url": (
+                "https://dashscope.aliyuncs.com/compatible-mode/v1"
+            ),
         }
         VectorStore._instance = None
         with patch("app.core.vector_store.CachedEmbeddings") as cached:

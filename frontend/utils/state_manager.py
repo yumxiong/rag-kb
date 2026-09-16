@@ -2,10 +2,12 @@
 状态管理工具
 用于管理应用状态并支持实时更新，避免页面刷新
 """
-import streamlit as st
+
 import time
-from typing import Dict, Any, Optional
 from datetime import datetime
+from typing import Any, Dict, Optional
+
+import streamlit as st
 
 
 class StateManager:
@@ -95,7 +97,7 @@ class StateManager:
 
         # 文档处理完成，触发相关组件刷新
         StateManager.trigger_refresh("documents", 1)  # 1秒后刷新文档列表
-        StateManager.trigger_refresh("stats", 1)      # 1秒后刷新统计信息
+        StateManager.trigger_refresh("stats", 1)  # 1秒后刷新统计信息
 
     @staticmethod
     def get_processing_jobs() -> set:
@@ -168,7 +170,9 @@ class RealtimeUpdater:
     """实时更新器，使用JavaScript和Session State实现无刷新更新"""
 
     @staticmethod
-    def create_document_completion_handler(job_id: str, component_name: str = "documents") -> str:
+    def create_document_completion_handler(
+        job_id: str, component_name: str = "documents"
+    ) -> str:
         """创建文档处理完成的JavaScript处理器"""
         js_code = f"""
         <script>

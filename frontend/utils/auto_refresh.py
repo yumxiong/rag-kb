@@ -1,8 +1,10 @@
 """
 自动刷新工具 - 使用简单有效的方法实现组件自动更新
 """
-import streamlit as st
+
 import time
+
+import streamlit as st
 
 
 def setup_auto_refresh(job_id: str, client_url: str) -> str:
