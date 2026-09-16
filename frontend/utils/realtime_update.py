@@ -2,8 +2,10 @@
 真正的实时更新方案
 使用JavaScript直接更新DOM元素，无需页面刷新
 """
-import streamlit as st
+
 import json
+
+import streamlit as st
 
 
 def setup_realtime_update_system(backend_url: str):
@@ -251,19 +253,19 @@ def create_realtime_document_monitor(job_id: str, client_url: str, mode: str) ->
     """
 
     if mode == "手动刷新（默认）":
-        completion_action = '''
+        completion_action = """
             statusDiv.innerHTML = "✅ 处理完成！内容已自动更新";
             // 实时更新页面内容
             if (window.RagRealtimeUpdater) {
                 window.RagRealtimeUpdater.updateAll();
             }
-        '''
+        """
     elif mode == "10秒后自动刷新":
         completion_action = create_realtime_countdown_action(10)
     elif mode == "30秒后自动刷新":
         completion_action = create_realtime_countdown_action(30)
     else:  # 实时更新模式
-        completion_action = f'''
+        completion_action = f"""
             console.log("开始实时更新处理...");
             statusDiv.innerHTML = "✅ 处理完成！正在实时更新内容...";
             statusDiv.style.color = "#1976d2";
@@ -398,7 +400,7 @@ def create_realtime_document_monitor(job_id: str, client_url: str, mode: str) ->
 
             // 延迟1秒执行，确保页面稳定
             setTimeout(performSafeRealtimeUpdate, 1000);
-        '''
+        """
 
     return f"""
     <div id="realtime-monitor-{job_id}" style="margin: 10px 0; padding: 12px; border: 2px solid #e1f5fe; border-radius: 8px; background: linear-gradient(135deg, #f8f9fa, #e3f2fd);">
@@ -507,7 +509,7 @@ def create_realtime_document_monitor(job_id: str, client_url: str, mode: str) ->
 
 def create_realtime_countdown_action(seconds: int) -> str:
     """创建实时更新倒计时"""
-    return f'''
+    return f"""
         let countdown = {seconds};
         statusDiv.innerHTML = `✅ 处理完成！${{countdown}}秒后实时更新内容...`;
         statusDiv.style.color = '#388e3c';
@@ -542,7 +544,7 @@ def create_realtime_countdown_action(seconds: int) -> str:
                 }}
             }}
         }}, 1000);
-    '''
+    """
 
 
 def add_realtime_refresh_buttons():
@@ -552,36 +554,50 @@ def add_realtime_refresh_buttons():
     col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
 
     with col1:
-        if st.button("📊 实时更新统计", help="实时更新文档统计信息", key="realtime_stats"):
-            st.components.v1.html("""
+        if st.button(
+            "📊 实时更新统计", help="实时更新文档统计信息", key="realtime_stats"
+        ):
+            st.components.v1.html(
+                """
             <script>
             if (window.RagRealtimeUpdater) {
                 window.RagRealtimeUpdater.updateStats();
             }
             </script>
-            """, height=0, width=0)
+            """,
+                height=0,
+                width=0,
+            )
             st.success("✅ 统计信息已实时更新")
 
     with col2:
         if st.button("📄 实时更新列表", help="实时更新文档列表", key="realtime_docs"):
-            st.components.v1.html("""
+            st.components.v1.html(
+                """
             <script>
             if (window.RagRealtimeUpdater) {
                 window.RagRealtimeUpdater.updateDocumentList();
             }
             </script>
-            """, height=0, width=0)
+            """,
+                height=0,
+                width=0,
+            )
             st.success("✅ 文档列表已实时更新")
 
     with col3:
         if st.button("🎉 实时更新全部", help="实时更新所有内容", key="realtime_all"):
-            st.components.v1.html("""
+            st.components.v1.html(
+                """
             <script>
             if (window.RagRealtimeUpdater) {
                 window.RagRealtimeUpdater.updateAll();
             }
             </script>
-            """, height=0, width=0)
+            """,
+                height=0,
+                width=0,
+            )
             st.success("✅ 所有内容已实时更新")
 
     with col4:
@@ -600,11 +616,11 @@ def setup_realtime_refresh_mode():
                 "实时更新（推荐）",
                 "手动更新",
                 "10秒后实时更新",
-                "30秒后实时更新"
+                "30秒后实时更新",
             ],
             index=0,
             key="realtime_refresh_mode",
-            help="实时更新无需刷新页面，直接更新内容"
+            help="实时更新无需刷新页面，直接更新内容",
         )
 
         if refresh_mode == "实时更新（推荐）":

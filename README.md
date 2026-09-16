@@ -1,5 +1,17 @@
 # RAG Knowledge Base
 
+一个可复现的中文 RAG 知识库 Demo：上传文档、异步处理、语义检索，并在回答中展示可核对的原文来源。
+
+[真实演示](docs/demo.md) · [本地启动](#quick-start) · [评测状态](docs/evaluation.md)
+
+![真实回答与来源](docs/assets/a06-answer-sources.png)
+
+后端是 FastAPI，前端是 Streamlit，向量存储使用 ChromaDB，问答链路使用 LangChain。先看[真实演示](docs/demo.md)，再看[本地启动](#quick-start)或[部署指南](docker/README.md)。
+
+**当前状态：** A05/A06 的干净环境、真实模型问答和来源展示已验证；公开检索评测仍在人工审核，Docker 镜像构建尚未验收。详见[检索评测状态](#检索评测状态)。
+
+[文档导航](docs/README.md) · [真实演示](docs/demo.md) · [部署指南](docker/README.md) · [任务取消](docs/CANCEL_TASK_GUIDE.md)
+
 一个面向中文与多模型场景的 RAG（Retrieval-Augmented Generation）知识库系统：
 
 - 后端使用 **FastAPI** 提供文档、问答、配额、成本监控等 API
@@ -7,7 +19,15 @@
 - 底层使用 **ChromaDB + LangChain** 构建向量检索与问答链路
 - 支持 **OpenAI / DeepSeek / Zhipu / Qwen / OpenAI-compatible** 多种接入方式
 
-它不仅是一个“能跑起来”的 RAG Demo，也包含了不少更贴近真实产品环境的能力：**异步文档处理、实时状态更新、任务取消、扫描版 PDF OCR、BYOK、自定义配额、缓存节流、管理员控制台、Docker/HTTPS 部署**。
+代码还包含任务取消、OCR、BYOK、配额、缓存和 Docker/HTTPS 配置；这些功能的实现范围与实际验证范围不同，见文末限制。
+
+| 工程能力 | 实现入口 | 验证范围 |
+| --- | --- | --- |
+| 异步上传与任务状态 | [处理器](app/core/async_processor.py)、[上传 API](app/api/documents.py) | 演示 Markdown 异步入库通过 |
+| 检索生成与原文来源 | [问答引擎](app/core/qa_engine.py) | 真实模型回答及页面来源通过 |
+| 聊天与嵌入配置分离 | [配置](app/core/config.py)、[向量存储](app/core/vector_store.py) | DeepSeek 聊天 + Qwen 嵌入通过 |
+| 嵌入与问答缓存 | [缓存管理](app/core/cache_manager.py) | 首次真实回答、后续缓存展示通过 |
+| 配额与管理员鉴权 | [配额管理](app/core/quota_manager.py)、[鉴权](app/api/auth.py) | 专项测试及演示管理员登录通过 |
 
 ## ✨ 核心能力
 
@@ -49,13 +69,28 @@
 
 ### 工程化能力
 
-- FastAPI 自动文档：`/docs`
+- FastAPI 自动文档：默认关闭，可显式启用 `/docs`
 - 单元测试、覆盖率、lint、format 命令齐全
 - Docker / Docker Compose 开发与部署配置
 - 本地 HTTPS 开发脚本与 Nginx 配置
 - Secret 文件、环境变量、Keyring 等多种安全配置方式
 
 ## 🏗️ 系统架构
+
+```mermaid
+flowchart LR
+  U[Streamlit 前端] --> A[FastAPI API]
+  A --> P[文档处理与异步任务]
+  P --> E[Embedding Provider]
+  E --> V[(ChromaDB 向量库)]
+  A --> Q[检索与 QAEngine]
+  Q --> E
+  V --> Q
+  Q --> L[LLM Provider]
+  L --> S[回答与来源展示]
+```
+
+上传路径是“前端 → API → 文档处理 → 向量库”；问答路径是“问题 → 检索 → LLM → 回答与来源”。
 
 ```text
 Streamlit UI
@@ -124,6 +159,8 @@ data/            # 上传文件、向量库、配额、任务状态
 secrets/         # 本地 secret 文件（请勿提交）
 ```
 
+<a id="quick-start"></a>
+
 ## 🚀 快速开始
 
 ### 1) 环境要求
@@ -133,175 +170,115 @@ secrets/         # 本地 secret 文件（请勿提交）
 - Docker（可选）
 - 可用的 LLM API Key（OpenAI / DeepSeek / Zhipu 等）
 
-### 2) 克隆仓库
+### 2) Bash：克隆、安装与配置
+
+以下命令使用 Python 3.11，从仓库根目录运行。前后端安装到同一虚拟环境，两个依赖文件都需要安装。
+
+两份依赖文件的 Requests 已统一为 `2.32.5`。有 Make 和 Bash 的环境也可在激活虚拟环境后使用 `make install`，该目标安装前后端依赖。已有环境可能保留不兼容的传递依赖，建议使用新环境，并执行 `python -m pip check`。
 
 ```bash
-git clone <your-repo-url>
-cd <your-repo-dir>
-```
-
-### 3) 创建虚拟环境
-
-```bash
-python -m venv venv
-
-# Linux / macOS
-source venv/bin/activate
-
-# Windows
-venv\Scripts\activate
-```
-
-### 4) 安装依赖
-
-```bash
-make install
-```
-
-如果你不使用 `make`，也可以手动执行：
-
-```bash
+git clone https://github.com/yumxiong/rag-kb.git
+cd rag-kb
+python3.11 -m venv .venv
+source .venv/bin/activate
 python -m pip install --upgrade pip
-pip install -r requirements.txt
-mkdir -p data/uploads data/chroma_db logs
+python -m pip install -r requirements.txt -r requirements-frontend.txt
+python -m pip check
+cp .env.secure.example .env
+mkdir -p data/uploads data/chroma_db data/job_status logs
 ```
 
-### 5) 配置模型与密钥
+### 3) PowerShell：克隆、安装与配置
 
-推荐方式：
+```powershell
+git clone https://github.com/yumxiong/rag-kb.git
+Set-Location rag-kb
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt -r requirements-frontend.txt
+.\.venv\Scripts\python.exe -m pip check
+Copy-Item .env.secure.example .env
+New-Item -ItemType Directory -Force data/uploads,data/chroma_db,data/job_status,logs | Out-Null
+```
 
-1. 复制一个示例配置
-2. 填入你的 API Key
-3. 启动服务
+仅首次配置时复制模板；已有 `.env` 时直接编辑。模板不含有效密钥。填写匹配聊天提供商的 `API_KEY`（默认 OpenAI 也可用 `OPENAI_API_KEY`），并为文档入库和检索配置 `EMBEDDING_API_KEY`。同一提供商可使用同一个有效 Key；不同提供商须分别填写。只有前端 BYOK 聊天 Key 不能替代服务端 Embedding Key。
 
-示例文件：
+上传文档需要管理员登录。配置 `JWT_SECRET` 和 `ADMIN_PASSWORD_HASH`，可用 `python scripts/generate_admin_hash.py` 生成密码哈希；未配置时管理员登录不可用。访客可对已入库文档直接提问。更多信息见 [模型配置](SETUP_API_KEY.md) 和 [安全指南](SECURITY.md)。
 
-- `.env.secure.example`：安全配置模板
-- `.env.deepseek`：DeepSeek 示例
-- `.env.zhipu`：Zhipu 示例
+### 4) 分别启动后端与前端
 
-最简单的方式是使用环境变量：
+Bash 终端 1（仓库根目录）：
 
 ```bash
-# Linux / macOS
-export OPENAI_API_KEY="your-key"
-
-# Windows PowerShell
-$env:OPENAI_API_KEY="your-key"
+source .venv/bin/activate
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-也可以使用：
-
-- `API_KEY`
-- `OPENAI_API_KEY_FILE`
-- Docker secrets
-- 系统 Keyring（`make setup-keyring`）
-
-更多安全说明请查看 [SECURITY.md](SECURITY.md)。
-
-### 6) 启动开发环境
-
-#### 方案 A：一键启动
+Bash 终端 2（同一仓库根目录）：
 
 ```bash
-make dev
+source .venv/bin/activate
+BACKEND_URL=http://localhost:8000 BACKEND_URL_CLIENT=http://localhost:8000 python -m streamlit run frontend/streamlit_app.py --server.address 127.0.0.1 --server.port 8501
 ```
 
-#### 方案 B：手动分别启动
+PowerShell 终端 1：
 
-终端 1：
-
-```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-终端 2：
+PowerShell 终端 2：
 
-```bash
-BACKEND_URL=http://localhost:8000 streamlit run frontend/streamlit_app.py
+```powershell
+$env:BACKEND_URL = 'http://localhost:8000'
+$env:BACKEND_URL_CLIENT = 'http://localhost:8000'
+.\.venv\Scripts\python.exe -m streamlit run frontend/streamlit_app.py --server.address 127.0.0.1 --server.port 8501
 ```
 
-### 7) 访问地址
+前端地址为 http://localhost:8501，健康接口为 http://localhost:8000/health。健康接口检查配置和目录，不证明模型调用成功。`/docs`、`/redoc`、`/openapi.json` 默认关闭；仅需本地调试时在 `.env` 设置 `ENABLE_API_DOCS=True` 后重启后端。
 
-- Frontend: http://localhost:8501
-- Backend API: http://localhost:8000
-- Swagger Docs: http://localhost:8000/docs
-- Health Check: http://localhost:8000/health
+2026-09-14 在 Windows / Python 3.11.5 新建隔离环境完成前后端依赖安装、`pip check` 和本地核心问答验收：虚构 Markdown 上传、真实 Qwen 嵌入入库、DeepSeek 回答及浏览器来源展示均已验证。实际安装发现的兼容问题通过 `chardet<6`、`posthog<6` 约束修复；管理员元数据查询与向量查询的 Chroma 配置已统一，Qwen 使用配置的兼容端点并发送文本。
+
+完整演示说明见 [docs/demo.md](docs/demo.md)，其中包含截图、操作步骤和验收范围。演示素材为[演示支持政策](docs/examples/demo-support-policy.md)。先按上文配置管理员密码哈希和 JWT 密钥，登录前端 Admin 页，返回主页，从侧栏选择该文件并点击“上传文件”。等待任务完成、知识库显示 1 个文档后，提问“导出文件保留多久？”。本次回答为“导出文件保留七天；超过七天后需要重新申请”，API 和页面参考来源均为 `demo-support-policy.md`。上传成功仅表示进入队列，须另外确认处理完成。
+
+本次非敏感模型配置如下；两个 Key 分别通过安全环境提供，不填写到公开文件中：
+
+```dotenv
+LLM_PROVIDER=deepseek
+CHAT_MODEL=deepseek-flash
+API_BASE_URL=https://api.deepseek.com
+EMBEDDING_PROVIDER=qwen
+EMBEDDING_MODEL=text-embedding-v3
+EMBEDDING_API_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+```
+
+验收使用独立上传、Chroma、缓存及任务目录，后端/前端绑定 `127.0.0.1:18000/18501`，相应调整 `BACKEND_URL`、`BACKEND_URL_CLIENT` 和 CORS。首次 API 回答 `from_cache=false`；随后浏览器展示复用了该真实回答的缓存。专项单测原有 100 项通过，修复后的向量存储专项 32 项通过；这些结果不代表全应用覆盖率验收。Docker 仅完成先前的 Compose 配置解析，未构建镜像；OCR、HTTPS 和生产部署未做本轮端到端验收。本机曾出现内存/线程资源不足及浏览器卡死，释放本轮资源并重启浏览器后完成验收。
 
 ## 🐳 Docker 与 HTTPS
 
-### Docker 开发模式
+[部署指南](docker/README.md) 是 Docker 主入口。标准 `docker-compose.yml` 仅在 Docker 网络内暴露 8000/8501，不发布宿主机端口，也不自动将根目录 `.env` 注入后端。
+
+本地 HTTP 开发需要准备 `.env.dev`，并合并标准与开发配置：
 
 ```bash
-make docker-dev
+docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml up -d --build
 ```
 
-对应配置文件：`docker/docker-compose.dev.yml`
+此命令同样适用于 PowerShell。开发模式将 8000/8501 绑定到 `127.0.0.1`。HTTPS 还需要 mkcert 证书及 `.env.local-https`；生产 Compose 文件未随仓库提供，不能直接运行其文件名。
 
-### Docker 常规运行
+## 🤖 模型、Provider 与 Key
 
-```bash
-make docker-run
-```
+聊天和嵌入配置独立。聊天通过 OpenAI-compatible 客户端；嵌入明确支持 `openai`、`zhipu`、`qwen` 路径。不要把 DeepSeek 聊天 Key 当成 OpenAI 嵌入 Key。
 
-停止服务：
+| 用途 | 配置 | Key |
+| --- | --- | --- |
+| 服务端聊天 | `LLM_PROVIDER`、`CHAT_MODEL`、`API_BASE_URL` | `API_KEY` / `API_KEY_FILE`，兼容 `OPENAI_API_KEY` |
+| 服务端嵌入 | `EMBEDDING_PROVIDER`、`EMBEDDING_MODEL`、`EMBEDDING_API_BASE_URL` | 优先 `EMBEDDING_API_KEY` / `EMBEDDING_API_KEY_FILE`，缺省可回退通用 Key |
+| 前端 BYOK | 请求中的 Provider、Model、Base URL | 用户聊天 Key，不覆盖服务端嵌入配置 |
 
-```bash
-make docker-stop
-```
+前端自定义聊天 URL 必须使用 HTTPS、通过 `ALLOWED_CHAT_BASE_URLS` 前缀白名单与 DNS 地址检查，不能指向私网/回环地址；提供自定义 URL 还必须同时提供用户 Key。白名单默认包含 OpenAI、DeepSeek、智谱和 OpenRouter，未包含 Qwen 聊天端点。服务端 `API_BASE_URL` 不走这一请求覆盖检查，由部署者配置。
 
-查看日志：
-
-```bash
-make docker-logs
-```
-
-### 本地 HTTPS 开发
-
-仓库内已经提供本地 HTTPS 配置脚本与 Nginx 配置。
-
-```bash
-make setup-local-https
-make dev-https
-```
-
-适合需要测试浏览器安全策略、同源/混合内容、HTTPS 场景联调时使用。
-
-## 🤖 支持的模型与接入方式
-
-### 服务端配置
-
-通过环境变量控制：
-
-- `LLM_PROVIDER`
-- `EMBEDDING_PROVIDER`
-- `CHAT_MODEL`
-- `EMBEDDING_MODEL`
-- `API_KEY`
-- `API_BASE_URL`
-- `EMBEDDING_API_BASE_URL`
-
-常见 provider：
-
-- `openai`
-- `deepseek`
-- `zhipu`
-- `qwen`
-
-### 前端 BYOK
-
-前端支持用户临时输入自己的：
-
-- Provider
-- API Key
-- Base URL
-- Model
-
-这些设置会保存在浏览器本地存储中，适合：
-
-- 临时切换模型测试
-- 多环境联调
-- 平台 Key 与用户 Key 并存的场景
+前端可将用户模型设置保存在浏览器本地存储，共用浏览器时需清理保存的 Key。各提供商默认映射和示例见 [模型配置指南](SETUP_API_KEY.md)。
 
 ## 📄 文档处理说明
 
@@ -429,7 +406,8 @@ python scripts/generate_admin_hash.py
 | 变量名 | 说明 | 默认值 |
 |---|---|---|
 | `APP_NAME` | 应用名称 | `RAG Knowledge Base` |
-| `DEBUG` | 调试模式 | `True` |
+| `DEBUG` | 调试模式 | `False` |
+| `ENABLE_API_DOCS` | API 文档与 OpenAPI | `False` |
 | `API_KEY` / `OPENAI_API_KEY` | 默认模型 API Key | 无 |
 | `LLM_PROVIDER` | 聊天模型提供商 | `openai` |
 | `EMBEDDING_PROVIDER` | 嵌入模型提供商 | `openai` |
@@ -438,13 +416,13 @@ python scripts/generate_admin_hash.py
 | `CHUNK_SIZE` | 文档分块大小 | `1000` |
 | `CHUNK_OVERLAP` | 分块重叠大小 | `200` |
 | `MAX_SOURCES` | 最多引用来源数 | `3` |
-| `SIMILARITY_THRESHOLD` | 相似度阈值 | `0.7` |
+| `SIMILARITY_THRESHOLD` | Chroma 距离阈值，越小越相似；不是百分比 | `1.5` |
 | `MAX_FILE_SIZE_MB` | 上传文件大小限制 | `50` |
 | `ENABLE_QUOTA_LIMIT` | 是否启用配额限制 | `True` |
 | `DEFAULT_DAILY_QUOTA` | 默认每日问答配额 | `5` |
 | `UPLOAD_DIR` | 上传文件目录 | `./data/uploads` |
 | `CHROMA_DB_PATH` | 向量库存储目录 | `./data/chroma_db` |
-| `ALLOWED_ORIGINS` | CORS 白名单 | `*` 或配置值 |
+| `ALLOWED_ORIGINS` | CORS 白名单 | `http://localhost:8501,http://127.0.0.1:8501` |
 
 ## 🧪 测试与开发命令
 
@@ -520,10 +498,22 @@ make test
 - 接入更多 OpenAI-compatible 服务
 - 增加更完整的管理员运维页面
 
+## 检索评测状态
+
+当前分支保留评测工具和离线测试；私人旧题集及旧成绩已移出当前跟踪范围。公开语料和题集仍在独立人工审核，本分支尚无公开、可复现的检索基线，也未完成正式 30 题评测。参见[评测状态](docs/evaluation.md)和[评测工具说明](eval/README.md)。专项测试通过不代表检索成绩。
+
+## 验证状态与已知限制
+
+2026-09-15 本地 Windows / Python 3.11.5 执行 `make format`、`make lint`、`make test`：336 项测试通过，`app/` 覆盖率 70.95%，达到 70% 门槛。该结果不包含前端覆盖率，也不替代 GitHub Linux CI 的发布前检查。
+
+真实问答证据限于一份虚构 Markdown 和指定问题，不代表任意知识库的答案准确率。演示资料中的“文件保留七天”是虚构服务政策，应用本身未实现这项导出保留策略。当前应用采用检索生成流程，未实现 Agent 规划或工具编排。
+
+Docker 镜像构建、OCR、HTTPS 和生产部署未完成本轮端到端验收；公开检索基线等待语料与题集人工审核。下一阶段发布前还需确认远端 CI、仓库入口和许可事项。
+
 ## 📄 License
 
-本项目采用 MIT License。
+当前仓库未提供 LICENSE，代码及自编语料的许可尚待作者明确；暂不声明采用 MIT 或其他开源许可。第三方依赖各自遵循其许可证。
 
 ---
 
-如果你想把它继续扩展成团队内部知识库、客服问答底座，或一个支持多租户/多模型的 RAG 平台，这个仓库已经具备一个很不错的工程起点。
+后续复现结果以实际启动、上传、问答及来源展示的验收记录为准。

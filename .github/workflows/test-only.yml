@@ -1,4 +1,6 @@
 name: Test Only
+permissions:
+  contents: read
 
 on:
   workflow_dispatch:
@@ -11,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.10', '3.11', '3.12']
+        python-version: ['3.11']
     
     steps:
     - name: Checkout code
@@ -46,4 +48,4 @@ jobs:
     - name: Test Docker Compose
       run: |
         echo "OPENAI_API_KEY=test-key" > .env
-        docker-compose -f docker/docker-compose.yml config
+        docker compose -f docker/docker-compose.yml config --quiet

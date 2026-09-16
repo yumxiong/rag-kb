@@ -1,36 +1,43 @@
-
 """
 Streamlit前端应用
 """
-import streamlit as st
-import streamlit.components.v1 as components
-import requests
-import os
-from datetime import datetime
-import time
+
 import json
 import logging
-import uuid
+import os
 import subprocess
+import time
+import uuid
+from datetime import datetime
+
+import requests
+import streamlit as st
+import streamlit.components.v1 as components
 
 logger = logging.getLogger(__name__)
+
 
 def get_git_version_info_frontend():
     """在Streamlit前端获取git版本信息"""
     try:
         # 在应用的根目录执行git命令
         project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-        branch = subprocess.check_output(
-            ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
-            cwd=project_root
-        ).strip().decode('utf-8')
-        commit = subprocess.check_output(
-            ['git', 'rev-parse', 'HEAD'],
-            cwd=project_root
-        ).strip().decode('utf-8')[:7]
+        branch = (
+            subprocess.check_output(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=project_root
+            )
+            .strip()
+            .decode("utf-8")
+        )
+        commit = (
+            subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=project_root)
+            .strip()
+            .decode("utf-8")[:7]
+        )
         return f"v: {branch} ({commit})"
     except Exception:
         return "v: unknown"
+
 
 def detect_provider_from_api_key(api_key: str) -> str:
     """根据API Key格式自动检测提供商"""
@@ -57,26 +64,30 @@ def detect_provider_from_api_key(api_key: str) -> str:
     # Default to openai if pattern doesn't match
     return "openai"
 
+
 # 尝试导入streamlit-js-eval，如果没有则使用备用方案
 try:
-    from streamlit_js_eval import streamlit_js_eval, get_geolocation
+    from streamlit_js_eval import get_geolocation, streamlit_js_eval
+
     JS_EVAL_AVAILABLE = True
 except ImportError:
     JS_EVAL_AVAILABLE = False
-    st.warning("⚠️ 建议安装 streamlit-js-eval 以获得更好的设置持久化体验: pip install streamlit-js-eval")
+    st.warning(
+        "⚠️ 建议安装 streamlit-js-eval 以获得更好的设置持久化体验: pip install streamlit-js-eval"
+    )
 
-from components.file_upload import FileUploadComponent
 from components.chat_interface import ChatInterface
-
+from components.file_upload import FileUploadComponent
+from utils.settings_loader import SettingsStatus
+from utils.settings_loader import load_user_settings as load_user_settings_shared
 from utils.state_manager import StateManager
-from utils.settings_loader import load_user_settings as load_user_settings_shared, SettingsStatus
 
 # 配置页面
 st.set_page_config(
     page_title="RAG知识库",
     page_icon="📚",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
 
@@ -97,7 +108,7 @@ def add_floating_admin_button():
         tooltip_text = "管理员入口"
         border = "1px solid rgba(15,23,42,0.12)"
         color = "#475569"
-    
+
     button_html = f"""
     <style>
     /* 隐藏侧边栏中的页面导航 */
@@ -226,14 +237,16 @@ def add_floating_admin_button():
     </a>
     <div class="admin-tooltip">{tooltip_text}</div>
     """
-    
+
     st.markdown(button_html, unsafe_allow_html=True)
 
 
 # 配置API端点
 # Docker环境中，前端容器使用backend服务名，但浏览器需要使用localhost
 BACKEND_URL_INTERNAL = os.getenv("BACKEND_URL", "http://localhost:8000")  # 服务器端调用
-BACKEND_URL_CLIENT = os.getenv("BACKEND_URL_CLIENT", "http://localhost:8000")  # 浏览器端调用
+BACKEND_URL_CLIENT = os.getenv(
+    "BACKEND_URL_CLIENT", "http://localhost:8000"
+)  # 浏览器端调用
 
 # 文档管理接口已改为管理员鉴权，禁用浏览器侧匿名轮询。
 # 如需恢复前端实时更新，请在后续改造中为浏览器请求加入安全鉴权机制。
@@ -263,21 +276,22 @@ def init_websocket_connection(client_id: str):
 def build_byok_headers() -> dict:
     """根据当前会话中的 BYOK 设置构造请求头"""
     headers = {}
-    api_key = st.session_state.get('byok_api_key', '').strip()
-    provider = st.session_state.get('byok_provider', '').strip()
-    base_url = st.session_state.get('byok_base_url', '').strip()
-    model = st.session_state.get('byok_model', '').strip()
+    api_key = st.session_state.get("byok_api_key", "").strip()
+    provider = st.session_state.get("byok_provider", "").strip()
+    base_url = st.session_state.get("byok_base_url", "").strip()
+    model = st.session_state.get("byok_model", "").strip()
 
     if api_key:
-        headers['LLM-Api-Key'] = api_key
+        headers["LLM-Api-Key"] = api_key
     if provider:
-        headers['LLM-Provider'] = provider
+        headers["LLM-Provider"] = provider
     if base_url:
-        headers['LLM-Base-URL'] = base_url
+        headers["LLM-Base-URL"] = base_url
     if model:
-        headers['LLM-Model'] = model
+        headers["LLM-Model"] = model
 
     return headers
+
 
 def check_backend_connection():
     """检查后端连接"""
@@ -287,9 +301,11 @@ def check_backend_connection():
     except:
         return False
 
+
 def load_with_html_fallback():
     """Deprecated: use utils.settings_loader._load_with_html_fallback via shared loader."""
     pass
+
 
 def _normalize_local_storage_value(value: str, default: str = "") -> str:
     """Deprecated: normalization is handled in utils.settings_loader."""
@@ -305,12 +321,13 @@ def load_user_settings():
     """统一入口：使用共享加载器实现设置恢复与重试。"""
     load_user_settings_shared()
 
+
 def save_user_settings():
     """保存用户设置到浏览器localStorage"""
-    api_key = st.session_state.get('byok_api_key', '')
-    provider = st.session_state.get('byok_provider', 'openai')
-    base_url = st.session_state.get('byok_base_url', '')
-    model = st.session_state.get('byok_model', 'gpt-3.5-turbo')
+    api_key = st.session_state.get("byok_api_key", "")
+    provider = st.session_state.get("byok_provider", "openai")
+    base_url = st.session_state.get("byok_base_url", "")
+    model = st.session_state.get("byok_model", "gpt-3.5-turbo")
 
     timestamp = datetime.utcnow().isoformat()
 
@@ -327,17 +344,19 @@ def save_user_settings():
         provider=json.dumps(provider),
         base_url=json.dumps(base_url),
         model=json.dumps(model),
-        timestamp=json.dumps(timestamp)
+        timestamp=json.dumps(timestamp),
     )
 
     if JS_EVAL_AVAILABLE:
         try:
             streamlit_js_eval(
-                js_expressions=js_expr,
-                key="save_ls_byok",
-                want_output=False
+                js_expressions=js_expr, key="save_ls_byok", want_output=False
             )
-            logger.info("BYOK settings saved via JS eval: provider=%s, api_key_exists=%s", provider, bool(api_key))
+            logger.info(
+                "BYOK settings saved via JS eval: provider=%s, api_key_exists=%s",
+                provider,
+                bool(api_key),
+            )
             return
         except Exception as exc:
             logger.warning(f"JS-eval save failed, fallback to HTML: {exc}")
@@ -355,9 +374,13 @@ def save_user_settings():
         </script>
         """,
         height=0,
-        width=0
+        width=0,
     )
-    logger.info("BYOK settings saved via HTML fallback: provider=%s, api_key_exists=%s", provider, bool(api_key))
+    logger.info(
+        "BYOK settings saved via HTML fallback: provider=%s, api_key_exists=%s",
+        provider,
+        bool(api_key),
+    )
 
 
 def clear_user_settings():
@@ -365,7 +388,9 @@ def clear_user_settings():
     if JS_EVAL_AVAILABLE:
         try:
             import time
+
             from streamlit_js_eval import streamlit_js_eval
+
             js_code = """
             (function(){
               try{
@@ -380,7 +405,7 @@ def clear_user_settings():
             streamlit_js_eval(
                 js_expressions=js_code,
                 key=f"clear_all_settings_{int(time.time()*1000)}",
-                want_output=False
+                want_output=False,
             )
         except Exception as e:
             logger.warning(f"清除设置时出错: {e}")
@@ -627,7 +652,9 @@ def render_kb_preview(library: dict):
             for d in remaining:
                 ext = (d.get("file_type") or "").lower()
                 icon = icon_map.get(ext, "📄")
-                st.caption(f"{icon} {d.get('filename','(unnamed)')} · {d.get('chunk_count',0)} 块")
+                st.caption(
+                    f"{icon} {d.get('filename','(unnamed)')} · {d.get('chunk_count',0)} 块"
+                )
 
 
 def render_byok_advanced():
@@ -643,7 +670,9 @@ def render_byok_advanced():
             )
 
             detected_provider = (
-                detect_provider_from_api_key(api_key) if api_key else st.session_state.byok_provider
+                detect_provider_from_api_key(api_key)
+                if api_key
+                else st.session_state.byok_provider
             )
             provider_options = ["openai", "deepseek", "zhipu", "custom"]
             current_provider = st.session_state.byok_provider
@@ -671,17 +700,23 @@ def render_byok_advanced():
             with col1:
                 saved = st.form_submit_button(
                     "💾 保存",
-                    on_click=lambda: st.session_state.__setitem__("skip_restore_once", True),
+                    on_click=lambda: st.session_state.__setitem__(
+                        "skip_restore_once", True
+                    ),
                 )
             with col2:
                 auto_detect = st.form_submit_button(
                     "🎯 自动检测",
-                    on_click=lambda: st.session_state.__setitem__("skip_restore_once", True),
+                    on_click=lambda: st.session_state.__setitem__(
+                        "skip_restore_once", True
+                    ),
                 )
             with col3:
                 cleared = st.form_submit_button(
                     "🗑️ 清除",
-                    on_click=lambda: st.session_state.__setitem__("skip_restore_once", True),
+                    on_click=lambda: st.session_state.__setitem__(
+                        "skip_restore_once", True
+                    ),
                 )
 
             if auto_detect and api_key:
@@ -692,7 +727,9 @@ def render_byok_advanced():
                     st.session_state.byok_base_url = "https://api.deepseek.com"
                     st.session_state.byok_model = "deepseek-chat"
                 elif detected == "zhipu":
-                    st.session_state.byok_base_url = "https://open.bigmodel.cn/api/paas/v4"
+                    st.session_state.byok_base_url = (
+                        "https://open.bigmodel.cn/api/paas/v4"
+                    )
                     st.session_state.byok_model = "glm-4"
                 elif detected == "openai":
                     st.session_state.byok_base_url = ""
@@ -755,7 +792,7 @@ def main():
     # add_floating_admin_button()
 
     # --- WebSocket & Client ID Management ---
-    if 'client_id' not in st.session_state:
+    if "client_id" not in st.session_state:
         st.session_state.client_id = str(uuid.uuid4())
         with st.container():
             init_websocket_connection(st.session_state.client_id)
@@ -870,7 +907,9 @@ def main():
     st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
 
     # 聊天界面（welcome 卡片 + 建议问题在内部渲染）
-    chat_interface = ChatInterface(BACKEND_URL_INTERNAL, st.session_state.get("admin_jwt"))
+    chat_interface = ChatInterface(
+        BACKEND_URL_INTERNAL, st.session_state.get("admin_jwt")
+    )
     chat_interface.render()
 
     # 管理员专属：文档管理面板（折叠在底部）

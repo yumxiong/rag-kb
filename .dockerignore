@@ -13,6 +13,8 @@ htmlcov/
 .tox/
 .venv/
 venv/
+venv*/
+.venv*/
 env/
 ENV/
 
@@ -62,3 +64,21 @@ Thumbs.db
 build/
 dist/
 *.egg-info/
+
+# Backups, local tooling and generated evaluation artifacts
+*.bak
+*.bak.*
+*.backup
+*~
+.agents/
+.codex/
+.claude/
+.mypy_cache/
+.ruff_cache/
+.coverage.*
+coverage.xml
+eval/results/
+eval/eval_set.json
+eval/eval_set_v1.json
+eval/eval_set_v2.json
+eval/eval_set_v3.json

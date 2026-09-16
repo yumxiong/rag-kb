@@ -9,7 +9,6 @@ from typing import Any, Dict, List, Optional
 import chromadb
 from chromadb.config import Settings as ChromaSettings
 from langchain_chroma import Chroma
-from langchain_community.embeddings import DashScopeEmbeddings
 from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 
@@ -73,36 +72,16 @@ class VectorStore:
             provider = model_config.get("embedding_provider")
             model_name = model_config["embedding_model"]
 
+            # 使用配置的兼容端点，避免绕过 embedding_api_base_url。
+            embedding_kwargs = {"api_key": api_key, "model": model_name}
+            if embedding_api_url and embedding_api_url != "https://api.openai.com/v1":
+                embedding_kwargs["base_url"] = embedding_api_url
+                embedding_kwargs["organization"] = ""
             if provider == "qwen":
-                # 使用原生 DashScopeEmbeddings，避免兼容模式在 /embeddings 的参数不一致
-                try:
-                    # 优先通过参数传入 Key；若版本不支持该参数，则回退到环境变量
-                    try:
-                        base_embeddings = DashScopeEmbeddings(
-                            model=model_name, dashscope_api_key=api_key
-                        )
-                    except TypeError:
-                        import os
-
-                        os.environ.setdefault("DASHSCOPE_API_KEY", api_key)
-                        base_embeddings = DashScopeEmbeddings(model=model_name)
-                except Exception as e:
-                    logger.error(f"Failed to initialize DashScopeEmbeddings: {e}")
-                    raise
-            else:
-                # 使用 OpenAIEmbeddings（支持 OpenAI 兼容 API）
-                embedding_kwargs = {
-                    "api_key": api_key,
-                    "model": model_name,
-                }
-                embedding_api_url = model_config.get("embedding_api_base_url")
-                if (
-                    embedding_api_url
-                    and embedding_api_url != "https://api.openai.com/v1"
-                ):
-                    embedding_kwargs["base_url"] = embedding_api_url
-                    embedding_kwargs["organization"] = ""
-                base_embeddings = OpenAIEmbeddings(**embedding_kwargs)
+                # DashScope 接收文本，不接收 OpenAI tokenizer 的 token IDs。
+                embedding_kwargs["check_embedding_ctx_length"] = False
+                embedding_kwargs["chunk_size"] = 10
+            base_embeddings = OpenAIEmbeddings(**embedding_kwargs)
 
             # 使用缓存包装器
             base = (embedding_api_url or "https://api.openai.com/v1").rstrip("/")
@@ -154,7 +133,14 @@ class VectorStore:
             return
         try:
             # 直接使用持久化客户端，避免LangChain封装与embeddings初始化
-            self.chroma_client = chromadb.PersistentClient(path=settings.chroma_db_path)
+            self.chroma_client = chromadb.PersistentClient(
+                path=settings.chroma_db_path,
+                settings=ChromaSettings(
+                    anonymized_telemetry=False,
+                    allow_reset=True,
+                    is_persistent=True,
+                ),
+            )
             # 确保集合存在
             try:
                 self.chroma_client.get_collection(self.collection_name)

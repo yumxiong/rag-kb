@@ -2,6 +2,7 @@
 最终简化的自动刷新方案
 使用最简单可靠的方法实现自动刷新
 """
+
 import streamlit as st
 
 
@@ -12,13 +13,15 @@ def create_simple_auto_refresh_html(job_id: str, client_url: str, mode: str) -> 
     """
 
     if mode == "手动刷新（默认）":
-        refresh_action = 'statusDiv.innerHTML = "✅ 处理完成！请点击右侧的🔄刷新按钮查看新文档";'
+        refresh_action = (
+            'statusDiv.innerHTML = "✅ 处理完成！请点击右侧的🔄刷新按钮查看新文档";'
+        )
     elif mode == "10秒后自动刷新":
         refresh_action = create_countdown_refresh(10)
     elif mode == "30秒后自动刷新":
         refresh_action = create_countdown_refresh(30)
     else:  # 立即刷新
-        refresh_action = '''
+        refresh_action = """
             statusDiv.innerHTML = "✅ 处理完成！1秒后自动刷新页面...";
             setTimeout(() => {
                 // 尝试多种刷新方式
@@ -37,7 +40,7 @@ def create_simple_auto_refresh_html(job_id: str, client_url: str, mode: str) -> 
                     }
                 }
             }, 1000);
-        '''
+        """
 
     return f"""
     <div id="refresh-monitor-{job_id}" style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 5px; background: #f9f9f9;">
@@ -137,7 +140,7 @@ def create_simple_auto_refresh_html(job_id: str, client_url: str, mode: str) -> 
 
 def create_countdown_refresh(seconds: int) -> str:
     """创建倒计时刷新逻辑"""
-    return f'''
+    return f"""
         let countdown = {seconds};
         statusDiv.innerHTML = `✅ 处理完成！页面将在${{countdown}}秒后自动刷新...`;
 
@@ -167,16 +170,19 @@ def create_countdown_refresh(seconds: int) -> str:
                 }}, 500);
             }}
         }}, 1000);
-    '''
+    """
 
 
 def add_refresh_status_indicator():
     """添加刷新状态指示器"""
-    st.markdown("""
+    st.markdown(
+        """
     <div style="position: fixed; top: 10px; right: 10px; z-index: 9999; background: rgba(255,255,255,0.9); padding: 5px 10px; border-radius: 5px; font-size: 12px; border: 1px solid #ddd;">
         📊 支持自动刷新
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 
 def add_enhanced_refresh_buttons():
@@ -188,7 +194,9 @@ def add_enhanced_refresh_buttons():
     with col1:
         if st.button("🔄 刷新统计", help="刷新文档统计信息", key="refresh_stats_btn"):
             # 清除相关缓存
-            cache_keys_to_clear = [k for k in st.session_state.keys() if 'cache' in k or 'refresh' in k]
+            cache_keys_to_clear = [
+                k for k in st.session_state.keys() if "cache" in k or "refresh" in k
+            ]
             for key in cache_keys_to_clear:
                 if key in st.session_state:
                     del st.session_state[key]
@@ -197,7 +205,9 @@ def add_enhanced_refresh_buttons():
     with col2:
         if st.button("🔄 刷新列表", help="刷新文档列表", key="refresh_docs_btn"):
             # 清除相关缓存
-            cache_keys_to_clear = [k for k in st.session_state.keys() if 'cache' in k or 'refresh' in k]
+            cache_keys_to_clear = [
+                k for k in st.session_state.keys() if "cache" in k or "refresh" in k
+            ]
             for key in cache_keys_to_clear:
                 if key in st.session_state:
                     del st.session_state[key]
@@ -206,7 +216,13 @@ def add_enhanced_refresh_buttons():
     with col3:
         if st.button("🔄 刷新全部", help="完整刷新页面", key="refresh_all_btn"):
             # 清除所有缓存
-            keys_to_keep = ['byok_api_key', 'byok_provider', 'byok_base_url', 'byok_model', 'refresh_mode']
+            keys_to_keep = [
+                "byok_api_key",
+                "byok_provider",
+                "byok_base_url",
+                "byok_model",
+                "refresh_mode",
+            ]
             for key in list(st.session_state.keys()):
                 if key not in keys_to_keep:
                     del st.session_state[key]
@@ -214,7 +230,7 @@ def add_enhanced_refresh_buttons():
 
     with col4:
         # 显示最后刷新时间
-        if 'last_refresh_time' not in st.session_state:
+        if "last_refresh_time" not in st.session_state:
             st.session_state.last_refresh_time = "未刷新"
 
         st.caption(f"最后刷新: {st.session_state.last_refresh_time}")

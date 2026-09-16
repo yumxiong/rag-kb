@@ -1,5 +1,7 @@
 # 任务取消功能使用指南
 
+本页为任务取消主入口：[快速操作](QUICK_START_CANCEL.md)、[演示脚本说明](DEMO_SCRIPT.md)、[历史实现记录](archive/IMPLEMENTATION_REPORT.md)。返回 [文档导航](README.md)。
+
 ## 📋 功能概述
 
 当上传大型文档（特别是扫描版PDF）时，后台处理可能需要较长时间。新增的任务取消功能允许用户在处理过程中随时停止任务，避免长时间等待。

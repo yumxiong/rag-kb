@@ -1,143 +1,43 @@
 # 模型配置指南
 
-本系统支持多种大语言模型提供商，包括OpenAI、DeepSeek、智谱AI等。以下是配置方法：
+从 [.env.secure.example](.env.secure.example) 复制本地 `.env` 后编辑。安装和启动命令见 [README](README.md)。
 
-## 支持的模型提供商
+## 聊天和嵌入
 
-- **OpenAI**: GPT-3.5/4，text-embedding-ada-002
-- **DeepSeek**: deepseek-chat，兼容OpenAI embedding
-- **智谱AI (GLM)**: glm-4，embedding-2
-- 更多模型提供商可轻松扩展...
+| Provider | 聊天默认映射 | 嵌入默认映射 |
+| --- | --- | --- |
+| openai | `https://api.openai.com/v1`，`gpt-3.5-turbo` | 同端点，`text-embedding-ada-002` |
+| deepseek | `https://api.deepseek.com`，`deepseek-v4-flash` | 无专用默认映射，应另配嵌入服务 |
+| zhipu | `https://open.bigmodel.cn/api/paas/v4`，`glm-4` | 同端点，`embedding-3` |
+| qwen | 须显式配置兼容聊天端点和模型 | `https://dashscope.aliyuncs.com/compatible-mode/v1`，`text-embedding-v3`；优先尝试 DashScope SDK |
 
-## 快速配置
+以上是代码映射，不保证供应商模型生命周期或账号可用性。默认模型替换仅在模型名仍为代码中的 OpenAI 默认值时发生；切换 Provider 时建议显式指定模型。
 
-### 使用DeepSeek（推荐，免费额度大）
+DeepSeek 聊天搭配 OpenAI 嵌入示例：
 
-1. 访问 [DeepSeek平台](https://platform.deepseek.com) 获取API Key
-2. 复制配置文件：
-   ```bash
-   cp .env.deepseek .env
-   ```
-3. 编辑 `.env` 文件，填入你的DeepSeek API Key：
-   ```
-   API_KEY=sk-your-deepseek-api-key-here
-   ```
-
-### 使用智谱AI
-
-1. 访问 [智谱AI开放平台](https://open.bigmodel.cn) 获取API Key
-2. 复制配置文件：
-   ```bash
-   cp .env.zhipu .env
-   ```
-3. 编辑 `.env` 文件，填入你的智谱AI API Key
-
-### 使用OpenAI
-
-1. 访问 [OpenAI平台](https://platform.openai.com/api-keys) 获取API Key
-2. 设置环境变量（见下方详细方法）
-
-## 方法一：使用自动化脚本（推荐）
-
-### Windows用户
-```cmd
-scripts\setup-env-windows.bat
-```
-
-### Linux/Mac用户  
-```bash
-./scripts/setup-env.sh
-```
-
-## 方法二：手动设置系统环境变量
-
-### Windows
-1. 右键点击"此电脑" → "属性"
-2. 点击"高级系统设置"
-3. 点击"环境变量"
-4. 在"用户变量"中点击"新建"
-5. 添加以下变量：
-   - 变量名：`LLM_PROVIDER`，变量值：`deepseek` (或 `openai`、`zhipu`)
-   - 变量名：`API_KEY`，变量值：你的API Key
-6. 重启命令提示符
-
-### Linux/Mac
-在 `~/.bashrc` 或 `~/.zshrc` 中添加：
-```bash
-export LLM_PROVIDER="deepseek"  # 或 openai, zhipu
-export API_KEY="your-api-key-here"
-```
-
-然后运行：
-```bash
-source ~/.bashrc  # 或 source ~/.zshrc
-```
-
-## 方法三：临时设置（仅当前会话有效）
-
-### Windows
-```cmd
-set LLM_PROVIDER=deepseek
-set API_KEY=your-api-key-here
-```
-
-### Linux/Mac
-```bash
-export LLM_PROVIDER="deepseek"
-export API_KEY="your-api-key-here"
-```
-
-## 获取API Key
-
-### DeepSeek
-1. 访问 [DeepSeek平台](https://platform.deepseek.com)
-2. 注册登录账户
-3. 在API Keys页面创建新的API Key
-4. 复制API Key（格式：`sk-...`）
-
-### 智谱AI (GLM)
-1. 访问 [智谱AI开放平台](https://open.bigmodel.cn)
-2. 注册登录账户
-3. 在API Keys页面创建新的API Key
-4. 复制API Key
-
-### OpenAI
-1. 访问 [OpenAI API Keys](https://platform.openai.com/api-keys)
-2. 登录账户
-3. 点击"Create new secret key"
-4. 复制API Key（格式：`sk-...`）
-
-## 验证设置
-
-设置完成后，运行启动脚本：
-```bash
-./scripts/start.sh
-```
-
-如果看到"✅ 检测到系统环境变量中的API Key"，说明设置成功。
-
-## 高级配置
-
-如需自定义模型参数，可以在 `.env` 文件中设置：
-```bash
-# 自定义聊天模型
-CHAT_MODEL=deepseek-chat
-
-# 自定义嵌入模型
-EMBEDDING_MODEL=text-embedding-ada-002
-
-# 自定义API端点
+```dotenv
+LLM_PROVIDER=deepseek
 API_BASE_URL=https://api.deepseek.com
-
-# 其他参数
-CHUNK_SIZE=1000
-MAX_SOURCES=3
+CHAT_MODEL=deepseek-v4-flash
+EMBEDDING_PROVIDER=openai
+EMBEDDING_API_BASE_URL=https://api.openai.com/v1
+EMBEDDING_MODEL=text-embedding-ada-002
 ```
 
-## 安全提醒
+分别通过系统环境或本地 `.env` 提供 `API_KEY` 和 `EMBEDDING_API_KEY`。不要把 DeepSeek 聊天 Key 当成 OpenAI 嵌入 Key。更换嵌入模型应重建向量库或使用新集合，不能混用不同模型的向量。
 
-- ⚠️ **不要**将API Key提交到代码仓库
-- ⚠️ **不要**在公共场所显示API Key
-- ✅ 使用环境变量或`.env`文件是推荐的安全做法
-- ✅ 定期轮换你的API Key
-- ✅ DeepSeek等国产模型通常有更大的免费额度
+## 密钥来源
+
+聊天依次读取 `API_KEY`、`API_KEY_FILE`、`API_KEY_BASE64`，然后兼容 `OPENAI_API_KEY` 及对应文件/Base64 配置，再尝试代码约定的 Docker secret 路径和 Keyring。
+
+嵌入优先读取 `EMBEDDING_API_KEY`、`EMBEDDING_API_KEY_FILE`、`EMBEDDING_API_KEY_BASE64`；智谱还可回退 `ZHIPU_API_KEY`，最后回退通用聊天 Key。跨提供商时显式配置嵌入 Key。Base64 只是编码，不是加密。
+
+容器使用文件 Key 时，明确设置 `API_KEY_FILE` 和 `EMBEDDING_API_KEY_FILE` 为实际挂载的容器内路径。宿主机 Keyring 和系统环境不会自动进入容器。
+
+## BYOK 与 URL
+
+BYOK 只覆盖聊天配置，不替换服务端嵌入 Key。自定义聊天 URL 必须同时提供用户 Key，并使用 HTTPS、匹配 `ALLOWED_CHAT_BASE_URLS` 前缀白名单，DNS 解析结果不得包含私网、回环、链路本地或组播地址。默认白名单不含 Qwen 聊天端点，需部署者显式配置。
+
+服务端 `API_BASE_URL` 不经过请求覆盖的 URL 检查。前端应显式选择 Provider，避免只凭 Key 长度猜测。浏览器可能保存设置和 Key，共用设备使用后清除。
+
+管理员登录另需 `JWT_SECRET` 和 `ADMIN_PASSWORD_HASH`（或对应文件/Base64配置）。密码哈希生成命令：`python scripts/generate_admin_hash.py`。参见 [安全指南](SECURITY.md)。

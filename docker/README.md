@@ -1,328 +1,81 @@
 # Docker 部署指南
 
-本目录包含 RAG 知识库系统的 Docker 部署配置。
+命令从仓库根目录执行，需要 Docker Engine 和 Compose v2。配置结构已核对，实际镜像构建、HTTPS 和问答尚待实测。
 
-## 📋 可用配置
+## 配置与端口
 
-### 1. 标准 Docker 部署
-**文件**: `docker-compose.yml`
+| 文件 | 用法 | 宿主机端口 |
+| --- | --- | --- |
+| `docker-compose.yml` | 基础服务定义，未给后端加载 env_file | 无；expose 8000/8501 仅供 Docker 网络内访问 |
+| `docker-compose.dev.yml` | 与基础文件合并，加载 `.env.dev` | `127.0.0.1:8000`、`127.0.0.1:8501` |
+| `docker-compose.local-https.yml` | 与基础文件合并，加载 `.env.local-https`，增加 Nginx | 80/443 绑定所有接口；5678/5679 调试端口仅绑定回环 |
+| `docker-compose.production.yml` / `docker-compose.secrets.yml` | 未随仓库提供 | 不能直接执行 |
 
-基础的 Docker 部署配置，适用于开发和测试。
+基础文件没有 Nginx、公开入口或有效模型凭证。根目录 `.env` 可供 Compose 插值，但不会自动注入容器；CLI 的 `--env-file` 同样不替代服务级 `env_file` / `environment`。
 
-```bash
-cd docker
-docker-compose up -d
-```
+## 本地 HTTP 开发
 
-访问:
-- 前端: http://localhost:8501
-- 后端: http://localhost:8000
-
-### 2. 开发模式
-**文件**: `docker-compose.dev.yml`
-
-支持代码热重载的开发模式。
+先阅读 [模型配置](../SETUP_API_KEY.md)。首次创建配置，Bash：
 
 ```bash
-cd docker
-docker-compose -f docker-compose.dev.yml up -d
+cp .env.secure.example .env.dev
 ```
 
-### 3. 本地 HTTPS 开发 ⭐
-**文件**: `docker-compose.local-https.yml`
+PowerShell：
 
-使用 mkcert 证书的本地 HTTPS 开发环境，零信任警告！
-
-**首次设置**:
-```bash
-# 1. 安装 mkcert
-# Windows: choco install mkcert
-# Mac: brew install mkcert
-# Linux: sudo apt install mkcert
-
-# 2. 生成本地证书
-make setup-local-https
-# 或: scripts/setup-local-https.bat (Windows)
-# 或: bash scripts/setup-local-https.sh (Linux/Mac)
-
-# 3. 启动 HTTPS 服务
-make dev-https
+```powershell
+Copy-Item .env.secure.example .env.dev
 ```
 
-访问:
-- https://localhost
-- https://127.0.0.1
-- https://local.rag-kb.dev (需要配置 hosts)
+编辑 `.env.dev`，填写聊天和嵌入 Key，不要覆盖已有配置。开发配置将宿主机 `secrets/` 只读挂载到 `/run/secrets/`，文件 Key 应填写容器内路径。基础配置的 environment 将上传和向量库存储路径覆盖为 `/app/data/...`。
 
-**优势**:
-- ✅ 真实的 HTTPS 环境
-- ✅ 零浏览器警告
-- ✅ 与生产环境配置一致
-- ✅ 测试 HTTPS 特性（CORS、安全头等）
-
-### 4. 生产环境部署
-**文件**: `docker-compose.production.yml`
-
-生产环境配置，支持多种 SSL 证书策略。
-
-#### 方案 A: 云厂商 SLB/ALB（推荐）
-
-**最简单的生产方案**：SSL 由云厂商处理，应用只需 HTTP。
+Bash / PowerShell 通用：
 
 ```bash
-# 1. 在云厂商控制台申请 SSL 证书
-# 2. 配置负载均衡器 HTTPS 监听
-# 3. 如需新建生产配置，可由 .env.production.template 复制为 .env.production
-ALLOWED_ORIGINS=https://yourdomain.com
-DEBUG=False
-
-# 4. 使用标准配置启动
-cd docker
-docker-compose up -d
+docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml config --quiet
+docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml up -d --build
+docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml ps
+docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml logs --tail 100 backend frontend
 ```
 
-#### 方案 B: Let's Encrypt
+访问 http://localhost:8501 和 http://localhost:8000/health。`/docs` 仅在 `.env.dev` 设置 `ENABLE_API_DOCS=True` 并重新创建容器后可用。开发覆盖文件没有完整 build 定义，不能单独使用。
 
-**免费 SSL 证书，自动续期**。
+停止服务：
 
 ```bash
-# 运行配置向导
-make setup-production-https
-# 选择方案 1，按提示操作
-
-# 启动服务
-cd docker
-docker-compose -f docker-compose.production.yml up -d
+docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml down
 ```
 
-#### 方案 C: 云厂商证书 + Nginx
+修改 env_file 后重新 `up -d` 创建容器，单纯 restart 不会加载新环境。修改宿主机端口应调整开发覆盖文件。
 
-**灵活的中间方案**。
+## 本地 HTTPS
+
+先安装 mkcert、生成并信任证书，见 [设置指南](../docs/deployment/HTTPS_SETUP_GUIDE.md) 和 [故障排除](../docs/deployment/HTTPS_TROUBLESHOOTING.md)。配置文件是根目录 `.env.local-https`，不能只创建 `.env`；填写后端 Settings 支持的字段，前端地址另行配置到容器环境。
 
 ```bash
-# 1. 下载证书文件
-# 2. 放置到 docker/nginx/certs/
-# 3. 运行配置向导
-make setup-production-https
-# 选择方案 3
-
-# 4. 启动服务
-cd docker
-docker-compose -f docker-compose.production.yml up -d
+docker compose -f docker/docker-compose.yml -f docker/docker-compose.local-https.yml config --quiet
+docker compose -f docker/docker-compose.yml -f docker/docker-compose.local-https.yml up -d --build
 ```
 
-## 🗂️ 目录结构
+访问 https://localhost。此模式不发布宿主机 8000/8501；80/443 当前绑定所有接口，不能宣称只允许本机访问。默认未挂载 secret 目录，使用文件 Key 时必须增加挂载。证书信任和完整调用流程仍需实测。
 
-```
-docker/
-├── docker-compose.yml              # 标准配置
-├── docker-compose.dev.yml          # 开发模式
-├── docker-compose.local-https.yml  # 本地HTTPS（推荐开发）
-├── docker-compose.production.yml   # 生产环境
-├── docker-compose.secrets.yml      # Docker Secrets配置
-├── Dockerfile.backend              # 后端镜像
-├── Dockerfile.frontend             # 前端镜像
-├── nginx/                          # Nginx配置
-│   ├── conf.d/
-│   │   ├── local-https.conf       # 本地HTTPS配置
-│   │   └── production.conf.template # 生产配置模板
-│   └── certs/                      # SSL证书目录
-│       ├── local-cert.pem         # mkcert生成（本地）
-│       ├── local-key.pem          # mkcert生成（本地）
-│       ├── production-cert.pem    # 生产证书（需要手动放置）
-│       └── production-key.pem     # 生产密钥（需要手动放置）
-└── README.md                       # 本文件
-```
+## 生产配置与生成文件
 
-## 🔧 常用命令
+[生产模板](../.env.production.template) 需按部署环境编辑，包含 secret 路径和前端变量；不能直接复制为本地后端 `.env`，后端 Settings 会拒绝未知字段。其中阈值、配额和文件大小是模板覆盖值，不等于代码默认值。
 
-### 基础操作
-```bash
-# 构建镜像
-make docker-build
+`scripts/setup-production-https.sh` 只准备部分 Nginx 配置，并按需复制生产环境模板；不会生成 `docker/docker-compose.production.yml`。它输出的生产 Compose/Certbot 命令依赖另行准备的服务定义，当前不是直接可复现的部署步骤。
 
-# 启动服务
-make docker-run
+`scripts/setup-secrets.sh` 写入 secret 文件，不生成 `docker-compose.secrets.yml`。使用前须明确挂载和 `*_FILE` 配置。宿主机凭证不会自动进入容器。
 
-# 停止服务
-make docker-stop
+对外部署还需反向代理、TLS、凭证注入、CORS 和前端地址配置；仅启动无对外端口的标准 Compose 不能让 SLB/ALB 连通应用。当前优先验证本地 HTTP 开发路径。
 
-# 查看日志
-make docker-logs
+## 排查与相关文档
 
-# 查看状态
-make docker-ps
-```
+用 `config --quiet` 检查配置，避免显示插值后的 Key；故障日志使用同一组 `-f` 参数查看。健康接口只检查凭证存在和目录，不证明 Embedding/聊天调用成功。
 
-### HTTPS 操作
-```bash
-# 设置本地HTTPS
-make setup-local-https
-
-# 启动HTTPS开发环境
-make dev-https
-
-# 停止HTTPS服务
-make stop-https
-
-# 测试HTTPS配置
-make test-https
-
-# 配置生产环境HTTPS
-make setup-production-https
-```
-
-## 🔐 安全配置
-
-### 环境变量
-创建 `.env` 文件（开发环境）、`.env.production.template`（生产模板）或 `.env.production`（生产实际配置）：
-
-```bash
-# API配置（使用安全方式）
-OPENAI_API_KEY=sk-xxx  # 或使用其他安全方式
-
-# CORS配置
-ALLOWED_ORIGINS=https://yourdomain.com
-ALLOWED_METHODS=GET,POST,DELETE
-ALLOWED_HEADERS=Content-Type,Authorization
-
-# 安全配置
-DEBUG=False  # 生产环境必须为False
-```
-
-### Docker Secrets（推荐生产环境）
-
-```bash
-# 设置secrets
-./scripts/setup-secrets.sh
-
-# 使用secrets启动
-cd docker
-docker-compose -f docker-compose.secrets.yml up -d
-```
-
-## 📊 监控和日志
-
-### 查看日志
-```bash
-# 所有服务
-docker-compose logs -f
-
-# 特定服务
-docker-compose logs -f backend
-docker-compose logs -f frontend
-docker-compose logs -f nginx
-```
-
-### 健康检查
-```bash
-# 后端健康检查
-curl http://localhost:8000/health
-# 或 HTTPS: curl https://localhost/health
-
-# 前端健康检查
-curl http://localhost:8501/_stcore/health
-```
-
-### 服务状态
-```bash
-docker-compose ps
-```
-
-## 🐛 故障排除
-
-### 问题 1: 端口被占用
-```bash
-# 检查端口占用
-netstat -ano | findstr :8000  # Windows
-lsof -i :8000                 # Linux/Mac
-
-# 修改端口
-# 编辑 docker-compose.yml 中的 ports 配置
-```
-
-### 问题 2: 证书错误（HTTPS）
-```bash
-# 检查证书是否存在
-ls -la docker/nginx/certs/
-
-# 重新生成证书
-make setup-local-https
-
-# 检查Nginx配置
-docker exec rag-kb-nginx nginx -t
-```
-
-### 问题 3: 容器无法启动
-```bash
-# 查看详细错误
-docker-compose logs backend
-docker-compose logs frontend
-
-# 检查配置文件
-docker-compose config
-
-# 重新构建
-docker-compose build --no-cache
-docker-compose up -d
-```
-
-### 问题 4: CORS 错误
-```bash
-# 更新CORS配置
-python scripts/setup-cors.py
-
-# 或手动编辑 .env
-ALLOWED_ORIGINS=https://your-domain.com
-
-# 重启服务
-docker-compose restart backend
-```
-
-## 📚 最佳实践
-
-### 开发环境
-1. 使用 `docker-compose.local-https.yml` 进行 HTTPS 开发
-2. 使用 mkcert 生成可信任的本地证书
-3. 启用 DEBUG=True 和详细日志
-4. 使用 volume 挂载以支持热重载
-
-### 生产环境
-1. **推荐**: 使用云厂商 SLB/ALB 做 SSL 终结
-2. 设置 DEBUG=False
-3. 配置严格的 CORS 策略
-4. 使用 Docker Secrets 管理敏感信息
-5. 启用日志轮转
-6. 配置健康检查和自动重启
-7. 定期备份 data 目录
-8. 设置资源限制（CPU、内存）
-
-### 安全建议
-1. ✅ 使用 HTTPS（生产环境必须）
-2. ✅ 定期更新 Docker 镜像
-3. ✅ 限制 CORS 到特定域名
-4. ✅ 使用强密码和密钥轮换
-5. ✅ 启用防火墙，只开放必要端口
-6. ✅ 监控异常访问和 API 使用
-7. ✅ 定期审计安全配置
-
-## 🔗 相关文档
-
-- [主 README](../README.md)
-- [安全配置指南](../SECURITY.md)
-- [API 文档](http://localhost:8000/docs)
-- [Nginx 官方文档](https://nginx.org/en/docs/)
-- [Docker Compose 文档](https://docs.docker.com/compose/)
-- [Let's Encrypt](https://letsencrypt.org/)
-- [mkcert](https://github.com/FiloSottile/mkcert)
-
-## 🆘 获取帮助
-
-如果遇到问题：
-1. 查看本文档的故障排除部分
-2. 检查日志: `make docker-logs`
-3. 查看 [GitHub Issues](../../issues)
-4. 运行健康检查: `make test-https`
-
-
-
+- [项目 README](../README.md)
+- [文档导航](../docs/README.md)
+- [安全指南](../SECURITY.md)
+- [HTTPS 快速操作](../docs/deployment/QUICK_START_HTTPS.md)
+- [历史资料](../docs/archive/README.md)
+- [GitHub Issues](https://github.com/yumxiong/rag-kb/issues)

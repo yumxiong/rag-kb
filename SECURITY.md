@@ -1,5 +1,7 @@
 # 🔐 安全配置指南
 
+当前模型配置以 [模型配置指南](SETUP_API_KEY.md) 为准，容器端口、env_file 和生成文件以 [部署指南](docker/README.md) 为准。`ENABLE_API_DOCS=False`、`DEBUG=False` 为代码默认值。Base64 是编码，不是加密；宿主机 Keyring 不会自动进入 Docker 容器。
+
 ## API Key安全管理
 
 为了保护您的OpenAI API Key，我们提供了多种安全的存储方式。**强烈建议不要将API Key明文存储在.env文件中**。
@@ -53,12 +55,12 @@ python scripts/setup-keyring.py delete
 
 # 使用secrets启动
 cd docker
-docker-compose -f docker-compose.secrets.yml up -d
+# 仓库未提供 docker-compose.secrets.yml；按部署指南自行配置挂载和 *_FILE。
 ```
 
-### 4. 加密文件存储 (★★★☆☆)
+### 4. 限制访问权限的文件存储
 
-将API Key存储在单独的文件中，设置严格的文件权限：
+将 API Key 存储在单独文件中并限制访问权限；下面的命令不会加密文件：
 
 ```bash
 # 创建密钥文件
@@ -86,7 +88,7 @@ export OPENAI_API_KEY_FILE="./secrets/openai_api_key/deepseek_api_key"
 ### 方式3: Docker Secrets
 ```bash
 cd docker
-docker-compose -f docker-compose.secrets.yml up -d
+# 仓库未提供 docker-compose.secrets.yml；按部署指南自行配置挂载和 *_FILE。
 ```
 
 ### 方式4: 系统密钥环
@@ -220,8 +222,8 @@ cp .env.template .env
 
 **生产部署:**
 ```bash
-cp .env.production.template .env
-# 或直接维护 .env.production 供 docker-compose.production.yml 使用
+cp .env.production.template .env.production
+# 生产 Compose 未提供，须另行准备；不要把含前端变量的模板直接作为后端 .env。
 # 编辑 ALLOWED_ORIGINS 为你的域名
 # 确保 DEBUG=False
 ```
