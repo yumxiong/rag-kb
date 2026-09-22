@@ -422,7 +422,7 @@ class TestSettings:
         config = settings.get_model_config()
 
         assert config["provider"] == "deepseek"
-        assert config["chat_model"] == "deepseek-v4-flash"
+        assert config["chat_model"] == "deepseek-flash"
         assert config["api_base_url"] == "https://api.deepseek.com"
         assert config["embedding_api_base_url"] == "https://api.openai.com/v1"
 

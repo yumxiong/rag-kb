@@ -1,0 +1,59 @@
+{
+  "corpus_version": "atlasdesk-demo-v1",
+  "status": "evidence_defined_runtime_validation_pending",
+  "questions": [
+    {
+      "id": "demo-01",
+      "homepage": true,
+      "question": "AtlasDesk 网页上传的单个文件最大支持多大？",
+      "answerable": true,
+      "required_facts": ["网页上传的单个文件大小上限为 40 MB"],
+      "forbidden_claims": ["将网页限制直接推广到所有 API 上传路径"],
+      "evidence": [{"file": "corpus/atlas-03-document-ingestion.md", "section": "网页上传", "quote": "通过网页界面上传时，单个文件大小上限为 40 MB。"}]
+    },
+    {
+      "id": "demo-02",
+      "homepage": true,
+      "source_question_id": "public-v1-dev-s01",
+      "question": "我把同一份材料换个文件名再上传，AtlasDesk 根据什么判断重复？",
+      "answerable": true,
+      "required_facts": ["比较规范化文件内容的 SHA-256 摘要", "不以文件名判断重复"],
+      "forbidden_claims": ["改文件名即可绕过重复检测"],
+      "evidence": [{"file": "corpus/atlas-03-document-ingestion.md", "section": "相同内容识别", "quote": "重复检测比较规范化文件内容的 SHA-256 摘要。判断依据是经过整理后的内容，而不是上传者给出的文件名。"}]
+    },
+    {
+      "id": "demo-03",
+      "homepage": true,
+      "source_question_id": "public-v1-dev-s03",
+      "question": "AtlasDesk 使用自带模型后，是否就不受索引额度限制了？",
+      "answerable": true,
+      "required_facts": ["BYOK 移除 AtlasDesk 的生成 token 费用", "不会免除索引页配额"],
+      "forbidden_claims": ["BYOK 免除所有费用和配额", "外部模型服务本身免费"],
+      "evidence": [{"file": "corpus/atlas-06-quotas-and-billing.md", "section": "自带模型的账务范围", "quote": "BYOK 移除 AtlasDesk 的生成 token 费用，但不会免除索引页配额。"}]
+    },
+    {
+      "id": "demo-04",
+      "homepage": true,
+      "source_question_id": "public-v1-dev-m01",
+      "question": "AtlasDesk 网页上传报 ING-413 是什么意思？单文件上限是多少？",
+      "answerable": true,
+      "require_all_evidence_documents": true,
+      "required_facts": ["ING-413 表示文件超过单文件上传限制", "网页上传单个文件大小上限为 40 MB"],
+      "forbidden_claims": ["将 ING-413 解释为索引配额耗尽或请求过于频繁"],
+      "evidence": [
+        {"file": "corpus/atlas-08-troubleshooting-and-escalation.md", "section": "按阶段识别问题", "quote": "| ING-413 | 文件超过单文件上传限制 | 整理文件后按上传路径的大小规则重新检查 |"},
+        {"file": "corpus/atlas-03-document-ingestion.md", "section": "网页上传", "quote": "通过网页界面上传时，单个文件大小上限为 40 MB。"}
+      ]
+    },
+    {
+      "id": "demo-05",
+      "homepage": false,
+      "question": "AtlasDesk 的私有化部署报价是多少？",
+      "answerable": false,
+      "required_facts": ["明确说明当前资料未提供私有化部署报价，无法据此给出价格"],
+      "forbidden_claims": ["编造报价、价格区间或折扣", "将套餐或 BYOK 的说明作为报价依据", "将资料未提及解释为明确不支持私有化部署"],
+      "evidence": [],
+      "absence_review": "2026-09-21 检查 9 份原文，无私有化、报价或价格条款；费用描述仅涉及 BYOK 与索引配额。实际拒答行为尚未验证。"
+    }
+  ]
+}

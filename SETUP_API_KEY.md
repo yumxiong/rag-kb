@@ -7,7 +7,7 @@
 | Provider | 聊天默认映射 | 嵌入默认映射 |
 | --- | --- | --- |
 | openai | `https://api.openai.com/v1`，`gpt-3.5-turbo` | 同端点，`text-embedding-ada-002` |
-| deepseek | `https://api.deepseek.com`，`deepseek-v4-flash` | 无专用默认映射，应另配嵌入服务 |
+| deepseek | `https://api.deepseek.com`，`deepseek-flash` | 无专用默认映射，应另配嵌入服务 |
 | zhipu | `https://open.bigmodel.cn/api/paas/v4`，`glm-4` | 同端点，`embedding-3` |
 | qwen | 须显式配置兼容聊天端点和模型 | `https://dashscope.aliyuncs.com/compatible-mode/v1`，`text-embedding-v3`；优先尝试 DashScope SDK |
 
@@ -18,7 +18,7 @@ DeepSeek 聊天搭配 OpenAI 嵌入示例：
 ```dotenv
 LLM_PROVIDER=deepseek
 API_BASE_URL=https://api.deepseek.com
-CHAT_MODEL=deepseek-v4-flash
+CHAT_MODEL=deepseek-flash
 EMBEDDING_PROVIDER=openai
 EMBEDDING_API_BASE_URL=https://api.openai.com/v1
 EMBEDDING_MODEL=text-embedding-ada-002

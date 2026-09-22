@@ -1,0 +1,2 @@
+# Preserve the exact snapshot bytes and manifest SHA-256 across platforms.
+*.md -text

@@ -437,7 +437,7 @@ class Settings(BaseSettings):
             elif not overrides.get("api_base_url") and not config["api_base_url"]:
                 config["api_base_url"] = "https://api.deepseek.com"
             if config["chat_model"] == "gpt-3.5-turbo":  # 如果还是默认值
-                config["chat_model"] = "deepseek-v4-flash"
+                config["chat_model"] = "deepseek-flash"
         elif config["provider"] == "zhipu":
             if not overrides.get("api_base_url") and (
                 provider_changed or auto_detected

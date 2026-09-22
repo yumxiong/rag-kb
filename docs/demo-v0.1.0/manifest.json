@@ -1,0 +1,94 @@
+{
+  "corpus_version": "atlasdesk-demo-v1",
+  "snapshot_date": "2026-09-21",
+  "source_branch": "feat/public-eval-corpus",
+  "source_commit": "2af58b56f8f5c494eca958fd5765d90158bb5c6c",
+  "source_documents_uncommitted_changes": false,
+  "provenance": "Project-authored fictional AtlasDesk corpus, selected for public demo by project maintainer.",
+  "upstream_status": "Draft; independent human review and retrieval baseline pending.",
+  "ingestion_allowlist": [
+    "corpus/atlas-01-product-and-plans.md",
+    "corpus/atlas-02-identity-and-access.md",
+    "corpus/atlas-03-document-ingestion.md",
+    "corpus/atlas-04-retrieval-and-generation.md",
+    "corpus/atlas-05-api-and-jobs.md",
+    "corpus/atlas-06-quotas-and-billing.md",
+    "corpus/atlas-07-security-and-retention.md",
+    "corpus/atlas-08-troubleshooting-and-escalation.md",
+    "corpus/atlas-09-release-notes.md"
+  ],
+  "files": [
+    {
+      "file": "corpus/atlas-01-product-and-plans.md",
+      "title": "AtlasDesk 产品与套餐",
+      "source_path": "eval/corpora/public_v1/atlas-01-product-and-plans.md",
+      "bytes": 6504,
+      "sha256": "1cd5a40f7e5f9b389b1d362d60e921ecf6a59470ffa8a0c9ca76034b6dd89513",
+      "source_git_blob_sha256": "1cd5a40f7e5f9b389b1d362d60e921ecf6a59470ffa8a0c9ca76034b6dd89513"
+    },
+    {
+      "file": "corpus/atlas-02-identity-and-access.md",
+      "title": "AtlasDesk 身份与访问",
+      "source_path": "eval/corpora/public_v1/atlas-02-identity-and-access.md",
+      "bytes": 6062,
+      "sha256": "4d2454baebd0ed5e2eda7a15323293028866020b19aa92666df2aee76e0fd8e5",
+      "source_git_blob_sha256": "4d2454baebd0ed5e2eda7a15323293028866020b19aa92666df2aee76e0fd8e5"
+    },
+    {
+      "file": "corpus/atlas-03-document-ingestion.md",
+      "title": "AtlasDesk 文档接入",
+      "source_path": "eval/corpora/public_v1/atlas-03-document-ingestion.md",
+      "bytes": 8165,
+      "sha256": "a59034e18ad549403a8deb3e644cd8878d111a7666222dc57fdf2e7d68281ca7",
+      "source_git_blob_sha256": "a59034e18ad549403a8deb3e644cd8878d111a7666222dc57fdf2e7d68281ca7"
+    },
+    {
+      "file": "corpus/atlas-04-retrieval-and-generation.md",
+      "title": "AtlasDesk 检索与生成",
+      "source_path": "eval/corpora/public_v1/atlas-04-retrieval-and-generation.md",
+      "bytes": 7362,
+      "sha256": "e97a410dcf4862dba07ca18b0fbe30ca56e97c2a1d87e1351d336a56264efdfe",
+      "source_git_blob_sha256": "e97a410dcf4862dba07ca18b0fbe30ca56e97c2a1d87e1351d336a56264efdfe"
+    },
+    {
+      "file": "corpus/atlas-05-api-and-jobs.md",
+      "title": "AtlasDesk 接口与异步任务",
+      "source_path": "eval/corpora/public_v1/atlas-05-api-and-jobs.md",
+      "bytes": 7990,
+      "sha256": "96a93cc57d5db7cdc7e6f40669a8f0a64ea52e069c590f4801cd350464cd5564",
+      "source_git_blob_sha256": "96a93cc57d5db7cdc7e6f40669a8f0a64ea52e069c590f4801cd350464cd5564"
+    },
+    {
+      "file": "corpus/atlas-06-quotas-and-billing.md",
+      "title": "AtlasDesk 配额与计费",
+      "source_path": "eval/corpora/public_v1/atlas-06-quotas-and-billing.md",
+      "bytes": 7309,
+      "sha256": "2bb2950037172720acebec972b71b7a169ae2eafbdf4e46807d1beb1073ff10a",
+      "source_git_blob_sha256": "2bb2950037172720acebec972b71b7a169ae2eafbdf4e46807d1beb1073ff10a"
+    },
+    {
+      "file": "corpus/atlas-07-security-and-retention.md",
+      "title": "AtlasDesk 安全与保留",
+      "source_path": "eval/corpora/public_v1/atlas-07-security-and-retention.md",
+      "bytes": 7585,
+      "sha256": "a1de78a23ef9db13eacd5d5fa41eaae4dd973dc1c3bf9518985775c086a4adfc",
+      "source_git_blob_sha256": "a1de78a23ef9db13eacd5d5fa41eaae4dd973dc1c3bf9518985775c086a4adfc"
+    },
+    {
+      "file": "corpus/atlas-08-troubleshooting-and-escalation.md",
+      "title": "AtlasDesk 故障排查与协作",
+      "source_path": "eval/corpora/public_v1/atlas-08-troubleshooting-and-escalation.md",
+      "bytes": 7314,
+      "sha256": "d9e5d973aa44eb603e181379501e8bb87904fca7402fd3a601713853a4319e36",
+      "source_git_blob_sha256": "d9e5d973aa44eb603e181379501e8bb87904fca7402fd3a601713853a4319e36"
+    },
+    {
+      "file": "corpus/atlas-09-release-notes.md",
+      "title": "AtlasDesk 发布说明",
+      "source_path": "eval/corpora/public_v1/atlas-09-release-notes.md",
+      "bytes": 7891,
+      "sha256": "a9c9292d9d1fe8f6f7da42c29bffc3dbde4b144201d5cde10d4526e3e1da98d9",
+      "source_git_blob_sha256": "a9c9292d9d1fe8f6f7da42c29bffc3dbde4b144201d5cde10d4526e3e1da98d9"
+    }
+  ]
+}
