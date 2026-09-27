@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 from langchain.chains import RetrievalQA
 from langchain_core.documents import Document
 from langchain_core.prompts import PromptTemplate
+from langchain_core.retrievers import BaseRetriever
 from langchain_openai import ChatOpenAI
 
 from app.core.cache_manager import cache_manager
@@ -17,6 +18,27 @@ from app.core.vector_store import VectorStore
 from app.models.schemas import QuestionResponse, SourceDocument
 
 logger = logging.getLogger(__name__)
+
+
+class EvidenceRetriever(BaseRetriever):
+    """Keep the two nearest chunks before filling with diverse candidates."""
+
+    nearest: Any
+    diverse: Any
+    k: int
+
+    def _get_relevant_documents(self, query: str, *, run_manager) -> List[Document]:
+        candidates = self.nearest.invoke(query) + self.diverse.invoke(query)
+        seen = set()
+        result = []
+        for doc in candidates:
+            identity = (doc.metadata.get("document_id"), doc.page_content)
+            if identity not in seen:
+                seen.add(identity)
+                result.append(doc)
+            if len(result) >= self.k:
+                break
+        return result
 
 
 def _format_scored_candidate(doc: Document, score: float) -> str:
@@ -62,9 +84,11 @@ class QAEngine:
             llm_kwargs = {
                 "model": model_config["chat_model"],
                 "api_key": api_key,
-                "temperature": 0.1,
-                "max_tokens": 1000,
+                "temperature": settings.llm_temperature,
+                "max_tokens": settings.llm_max_tokens,
             }
+            if model_config["provider"] == "deepseek":
+                llm_kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
 
             # 设置自定义API端点（如果指定）
             if (
@@ -243,11 +267,16 @@ class QAEngine:
             base = (model_cfg["api_base_url"] or "https://api.openai.com/v1").rstrip(
                 "/"
             )
-            model_name = f"{model_cfg['provider']}/{model_cfg['chat_model']}@{base}"
+            model_name = (
+                f"{model_cfg['provider']}/{model_cfg['chat_model']}@{base}"
+                f"|evidence-v1:{global_k}:{global_fetch_k}:{mmr_lambda_mult}"
+            )
 
             # 检查QA缓存
-            cached_result = cache_manager.get_qa_cache(
-                question, context_hash, model_name
+            cached_result = (
+                cache_manager.get_qa_cache(question, context_hash, model_name)
+                if settings.enable_qa_cache
+                else None
             )
             if cached_result:
                 processing_time = time.time() - start_time
@@ -285,6 +314,13 @@ class QAEngine:
                 retriever = self.vector_store.as_retriever(
                     search_type="mmr", search_kwargs=mmr_kwargs
                 )
+                retriever = EvidenceRetriever(
+                    nearest=self.vector_store.as_retriever(
+                        search_kwargs={"k": min(2, k_effective)}
+                    ),
+                    diverse=retriever,
+                    k=k_effective,
+                )
                 logger.info(
                     "QAEngine.ask retrieval_mode=global "
                     f"user_source_limit={user_source_limit} precheck_k={precheck_k} "
@@ -297,6 +333,8 @@ class QAEngine:
 
             # 处理答案
             answer = result.get("result", "抱歉，我无法找到相关信息来回答这个问题。")
+            if not answer.strip():
+                raise ValueError("Model returned an empty answer")
             if fallback_note:
                 answer = f"{fallback_note}\n\n" + answer
             source_docs = result.get("source_documents", [])
@@ -320,9 +358,10 @@ class QAEngine:
 
             # 缓存结果
             sources_dict = [src.model_dump() for src in sources]
-            cache_manager.set_qa_cache(
-                question, context_hash, answer, sources_dict, model_name
-            )
+            if settings.enable_qa_cache:
+                cache_manager.set_qa_cache(
+                    question, context_hash, answer, sources_dict, model_name
+                )
 
             # 计算处理时间
             processing_time = time.time() - start_time
@@ -362,10 +401,6 @@ class QAEngine:
                 metadata = doc.metadata
                 filename = metadata.get("filename", "Unknown")
                 content = doc.page_content
-
-                # 截断过长的内容
-                if len(content) > 300:
-                    content = content[:300] + "..."
 
                 source = SourceDocument(
                     document_name=filename,

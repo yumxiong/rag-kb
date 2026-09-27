@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.api.auth import require_admin
 from app.core.config import settings
+from app.core.demo_content import DEMO_QUESTIONS
 from app.core.qa_engine import QAEngine
 from app.core.url_safety import is_safe_base_url
 from app.core.vector_store import VectorStore
@@ -345,20 +346,11 @@ async def get_question_suggestions():
         collection_info = get_vector_store().get_collection_info()
 
         if collection_info.get("document_count", 0) == 0:
-            return {"suggestions": ["请先上传一些文档", "知识库目前为空"]}
-
-        # 返回一些通用的问题模板
-        suggestions = [
-            "这个文档讲的是什么？",
-            "有什么重要的信息？",
-            "能总结一下主要内容吗？",
-            "有哪些关键要点？",
-            "这个主题的详细说明是什么？",
-        ]
+            return {"suggestions": [], "document_count": 0}
 
         return {
-            "suggestions": suggestions,
-            "document_count": collection_info.get("document_count", 0),
+            "suggestions": list(DEMO_QUESTIONS),
+            "document_count": len(get_vector_store().list_documents()),
         }
 
     except Exception as e:

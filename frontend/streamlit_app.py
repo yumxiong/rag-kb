@@ -582,7 +582,7 @@ def render_hero():
             📚 知问 · 智能文档问答
           </h1>
           <div style="color:#64748b; font-size: 0.95rem; margin-bottom: 0.75rem;">
-            上传文档 · 精准检索 · AI 答疑 —— 一个轻量的 RAG 知识库 Demo
+            无需登录即可提问 · 检索公开演示资料 · 查看原文引用
           </div>
         </div>
         """,
@@ -595,13 +595,13 @@ def render_about_expander():
     with st.expander("ℹ️ 关于这个项目（点击展开）", expanded=False):
         st.markdown(
             """
-            **知问** 是一个面向个人知识库场景的 RAG 应用 Demo，支持上传 PDF / Word / Markdown 等文档，
+            **知问** 是一个 RAG 应用 Demo，支持由管理员上传 PDF / Word / Markdown 等文档，
             通过向量检索 + 大模型生成提供带出处的智能问答。
 
             **技术栈**：FastAPI · Streamlit · ChromaDB · OpenAI-compatible LLM · Docker
 
             **当前体验模式**：管理员（即作者）预置文档，访客无需登录即可直接提问。
-            如果你想突破免费配额，可在侧边栏「⚙️ 高级」中填写自己的 API Key。
+            回答基于检索到的文档生成；资料未提供的信息，应明确说明无法确认。
 
             > 这是一个持续迭代中的求职作品，欢迎交流反馈。
             """
@@ -660,7 +660,7 @@ def render_kb_preview(library: dict):
 def render_byok_advanced():
     """高级设置：自定义 API Key（默认折叠）。"""
     with st.expander("⚙️ 高级 · 使用自己的 API Key", expanded=False):
-        st.caption("配置将仅保存在你的浏览器本地，不会上传到服务器。")
+        st.caption("配置可保存在浏览器本地；提问时 API Key 会经本站后端发送给所选模型服务。")
         with st.form("byok_form"):
             api_key = st.text_input(
                 "API Key",
@@ -693,7 +693,7 @@ def render_byok_advanced():
             model = st.text_input(
                 "模型（可选）",
                 value=st.session_state.byok_model,
-                placeholder="gpt-4o-mini / deepseek-chat / glm-4",
+                placeholder="gpt-4o-mini / deepseek-flash / glm-4",
             )
 
             col1, col2, col3 = st.columns([1, 1, 1])
@@ -725,7 +725,7 @@ def render_byok_advanced():
                 st.session_state.byok_provider = detected
                 if detected == "deepseek":
                     st.session_state.byok_base_url = "https://api.deepseek.com"
-                    st.session_state.byok_model = "deepseek-chat"
+                    st.session_state.byok_model = "deepseek-flash"
                 elif detected == "zhipu":
                     st.session_state.byok_base_url = (
                         "https://open.bigmodel.cn/api/paas/v4"
@@ -881,6 +881,12 @@ def main():
 
     # Hero 区
     render_hero()
+
+    st.info(
+        "本演示使用 9 份 AtlasDesk 虚构产品文档，覆盖产品套餐、权限、文档接入、"
+        "检索、API、配额、安全、排障与版本说明。资料中的套餐、配额和产品能力"
+        "仅用于演示，不代表本站实际功能或服务承诺。知识库由管理员维护。"
+    )
 
     # 关于折叠卡
     render_about_expander()

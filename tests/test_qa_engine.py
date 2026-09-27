@@ -62,6 +62,7 @@ class TestQAEngine:
             # 模拟设置（放在 with 块内以使用 mock_settings）
             mock_settings.get_api_key.return_value = "test-api-key"
             mock_settings.max_sources = 3
+            mock_settings.retrieval_k_global = 6
             mock_settings.get_model_config.return_value = {
                 "provider": "openai",
                 "chat_model": "gpt-3.5-turbo",
@@ -222,7 +223,7 @@ class TestQAEngine:
         """测试处理源文档"""
         source_docs = [
             Document(
-                page_content="这是一个很长的测试内容" * 20,  # 超过300字符
+                page_content="这是一个很长的测试内容" * 50 + "关键证据在末尾",
                 metadata={"filename": "test1.txt", "page": 1},
             ),
             Document(page_content="短内容", metadata={"filename": "test2.txt"}),
@@ -233,11 +234,8 @@ class TestQAEngine:
         assert len(sources) == 2
         assert all(isinstance(src, SourceDocument) for src in sources)
 
-        # 验证长内容被截断
-        first_content = sources[0].content
-        assert len(first_content) <= 303  # 应该被截断到300字符加"..."
-        if len(first_content) > 300:
-            assert first_content.endswith("...")
+        # 引用必须保留完整分块，不能丢失末尾证据。
+        assert sources[0].content == source_docs[0].page_content
 
         # 验证短内容未被截断
         assert sources[1].content == "短内容"
@@ -358,6 +356,7 @@ class TestQAEngineIntegration:
         # 模拟设置
         mock_settings.get_api_key.return_value = "test-key"
         mock_settings.max_sources = 3
+        mock_settings.retrieval_k_global = 6
         mock_settings.get_model_config.return_value = {
             "provider": "openai",
             "chat_model": "gpt-3.5-turbo",

@@ -26,6 +26,7 @@ venv*/
 .env.zhipu
 
 # Data directories
+data/acceptance-step4/
 data/uploads/*
 data/chroma_db/*
 data/job_status/*

@@ -495,12 +495,15 @@ class TestQAAPI:
         response = client.get("/api/qa/suggestions")
         assert response.status_code == 200
         data = response.json()
-        assert "请先上传一些文档" in data["suggestions"]
+        assert data == {"suggestions": [], "document_count": 0}
 
     @patch("app.api.qa.vector_store")
     def test_get_suggestions_with_documents(self, mock_vector_store):
         """测试获取问题建议 - 有文档"""
         mock_vector_store.get_collection_info.return_value = {"document_count": 5}
+        mock_vector_store.list_documents.return_value = [
+            {"filename": str(i)} for i in range(5)
+        ]
 
         response = client.get("/api/qa/suggestions")
         assert response.status_code == 200
@@ -598,10 +601,10 @@ class TestQAEngineRetrievalDecoupling:
             "app.core.qa_engine.cache_manager.set_qa_cache"
         ):
             response_one = engine.ask("测试问题", max_sources=1)
-            first_call = vector_store.as_retriever.call_args
+            first_call = vector_store.as_retriever.call_args_list[0]
             vector_store.as_retriever.reset_mock()
             response_two = engine.ask("测试问题", max_sources=5)
-            second_call = vector_store.as_retriever.call_args
+            second_call = vector_store.as_retriever.call_args_list[0]
 
         assert len(response_one.sources) == 1
         assert len(response_two.sources) == 4

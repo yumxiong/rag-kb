@@ -2,7 +2,7 @@
 聊天界面组件
 """
 
-import time
+from html import escape
 from typing import Optional
 
 import requests
@@ -100,7 +100,7 @@ class ChatInterface:
                                     font-size: 12px;
                                     margin-right: 10px;
                                 ">{i}</span>
-                                <strong style="color: #667eea;">{source['document_name']}</strong>
+                                <strong style="color: #667eea;">{escape(source['document_name'])}</strong>
                             </div>
                         </div>
                         """,
@@ -114,7 +114,7 @@ class ChatInterface:
                             else source["content"]
                         )
                         st.markdown(
-                            f"<div style='padding-left: 34px; color: #666; font-size: 0.9em;'>{content_preview}</div>",
+                            f"<div style='padding-left: 34px; color: #666; font-size: 0.9em;'>{escape(content_preview)}</div>",
                             unsafe_allow_html=True,
                         )
 
@@ -138,11 +138,15 @@ class ChatInterface:
                 return data.get("suggestions", []), data.get("document_count", 0)
         except Exception:
             pass
-        return [], 0
+        return [], None
 
     def _render_welcome_and_suggestions(self):
         """空对话状态：欢迎卡片 + 胶囊式示例问题。"""
         suggestions, doc_count = self._fetch_suggestions()
+
+        if doc_count is None:
+            st.warning("暂时无法获取示例问题，请稍后刷新。你也可以直接输入问题。")
+            return
 
         if doc_count == 0:
             # 空知识库：友好引导
@@ -169,11 +173,11 @@ class ChatInterface:
                         border:1px solid #e0e7ff;border-radius:14px;padding:20px 22px;
                         margin:8px 0 16px 0;">
               <div style="font-size:1.1rem;font-weight:600;color:#312e81;margin-bottom:6px;">
-                👋 你好！我是基于 {doc_count} 个文档训练的智能助手
+                👋 从 {doc_count} 份文档中检索信息，为你解答
               </div>
               <div style="font-size:13px;color:#4338ca;line-height:1.6;">
                 左侧栏列出了当前可问答的文档范围。在下方输入框直接提问，或点击下面的建议快速开始。
-                每条回答都会附带文档出处，便于验证。
+                回答下方可查看检索来源；请展开原文核对，资料不足时不应据此推断。
               </div>
             </div>
             """,
@@ -187,12 +191,17 @@ class ChatInterface:
                 unsafe_allow_html=True,
             )
             top = suggestions[:4]
-            cols = st.columns(len(top))
+            cols = st.columns(2)
             for i, suggestion in enumerate(top):
-                with cols[i]:
+                with cols[i % 2]:
                     if st.button(
-                        suggestion, key=f"suggestion_{i}", use_container_width=True
+                        suggestion,
+                        key=f"suggestion_{i}",
+                        use_container_width=True,
+                        disabled=st.session_state.is_processing,
                     ):
+                        # Demo questions span the corpus, including two-source evidence.
+                        st.session_state.selected_doc_id = None
                         self._process_question(suggestion)
 
     def _fetch_scope_docs(self) -> list:
@@ -227,7 +236,7 @@ class ChatInterface:
 
         # 问题输入（主输入框，最显眼）
         user_question = st.chat_input(
-            "在这里提问，例如：这个项目的技术栈是什么？",
+            "向 AtlasDesk 文档提问…",
             disabled=st.session_state.is_processing,
             max_chars=MAX_QUESTION_LENGTH,
         )
@@ -386,7 +395,10 @@ class ChatInterface:
                         self._render_feedback(question, answer)
 
                     else:
-                        error_detail = response.json().get("detail", "未知错误")
+                        try:
+                            error_detail = response.json().get("detail", "请求失败")
+                        except ValueError:
+                            error_detail = f"服务暂时不可用（HTTP {response.status_code}），请稍后重试"
                         error_msg = f"❌ 处理问题时出错: {error_detail}"
                         st.error(error_msg)
 

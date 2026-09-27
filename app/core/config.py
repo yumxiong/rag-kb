@@ -97,7 +97,7 @@ class Settings(BaseSettings):
     retrieval_k_scoped: int = 3
     retrieval_k_global: int = 6
     retrieval_fetch_k_global: int = 24
-    retrieval_mmr_lambda_mult: float = 0.5
+    retrieval_mmr_lambda_mult: float = 0.3
 
     similarity_threshold: float = 1.5  # ChromaDB距离分数,值越小越相似,1.5以下通常为相关
 
