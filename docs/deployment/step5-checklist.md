@@ -1,8 +1,8 @@
 目标：在 rag_kb-deploy 中完成一套独立、可部署、可被 Streamlit 和未来 v0/Next 前端共同使用的匿名身份、配额和成本控制机制；在 rag_kb-integration 中按同一契约接入并验证新前端，最后由 deploy 统一完成生产部署验收。
 
-执行记录（2026-09-28）：第 0 步已完成，见 [基线文档](step5-baseline.md)及 [integration 回执快照](receipts/step5-integration-receipt-2026-09-28.md)。后端基线为 `58626e8d6b4df891564590da69865eb4f6795a4b`；integration 已确认边界但未同步代码，契约确定前仅开展独立页面工作。第 1 步进入拟定阶段，后续实现尚未开始。本清单不属于上述代码基线提交，随第 0 步文档独立归档。
+执行记录（2026-09-28）：第 0 步已完成，见 [基线文档](step5-baseline.md)及 [integration 回执快照](receipts/step5-integration-receipt-2026-09-28.md)。后端基线为 `58626e8d6b4df891564590da69865eb4f6795a4b`；integration 已确认边界但未同步代码。第 1 步契约已由双方冻结，deploy 正执行第 2 步。本清单不属于上述代码基线提交，随第 0 步文档独立归档。
 
-第 0 步文档归档：`66c38183e53294158efca66d4790489ca51f9112`。第 1 步产物：[共享契约草案](../api/anonymous-session-and-quota.md)，当前版本 `anonymous-quota-v1-draft.2`。integration 对 draft.1（`ef1d0f721e3390e595bf81b01ec7bd0acfe76dc8`）提出过期会话恢复与断电持久化两项修改意见，deploy 已据此修订，待 integration 复审 draft.2。本节下方第 1 步 `[x]` 表示已在草案定义，不表示双方已冻结或功能已实现；冲突时以当前草案为评审正文，原建议仅作为任务背景。
+第 0 步文档归档：`66c38183e53294158efca66d4790489ca51f9112`。第 1 步产物：[共享契约](../api/anonymous-session-and-quota.md)，版本 `anonymous-quota-v1-draft.2`，双方确认的正文提交为 `0f6ecf2ff2cec29158ea81616d6dbed4480dd67c`；[integration 接受回执](receipts/step5-contract-integration-acceptance-2026-09-28.md)已归档，契约冻结。功能按后续步骤分别验收。
 
 第 0 步：冻结协作边界和当前基线
 deploy 执行
@@ -158,7 +158,7 @@ Cookie/Header 约定；
 示例请求与响应；
 已知限制。
 完成标准
-[ ] deploy 和 integration 都认可同一份契约。（draft.1 已获两项修改意见；draft.2 待 integration 复审；第 0 步回执不代表认可契约。）
+[x] deploy 和 integration 都认可同一份契约。（双方确认 draft.2 正文提交 `0f6ecf2ff2cec29158ea81616d6dbed4480dd67c`，状态 frozen；见 [契约接受回执](receipts/step5-contract-integration-acceptance-2026-09-28.md)。第 0 步回执仍仅代表基线接收。）
 [x] integration 不再自行设计另一套身份或配额协议。（已在第 0 步回执接受该边界；当前仍只做独立页面工作。）
 [x] deploy 后续代码修改都有明确目标。（草案已定义目标；双方冻结后才进入第 2 步。）
 第 2 步：deploy 实现匿名身份
@@ -172,35 +172,35 @@ app/core/config.py
 frontend/streamlit_app.py
 可能新增 tests/test_anonymous_session.py
 执行项
-[ ] 新增匿名身份创建或获取接口。
-[ ] 后端签发不可预测或带签名的身份凭证。
-[ ] 后端只使用经过验证的身份计算配额键。
-[ ] 支持浏览器 Cookie。
-[ ] 支持 Streamlit 服务端转发身份。
-[ ] 明确反向代理下的 X-Forwarded-For 使用规则。
-[ ] 不再直接使用容器内部看到的 Streamlit IP 作为个人身份。
-[ ] 日志中不打印完整身份凭证。
-[ ] 对身份凭证设置过期策略。
-[ ] 匿名身份接口不能暴露配额内容之外的敏感信息。
+[x] 新增匿名身份创建或获取接口。
+[x] 后端签发不可预测或带签名的身份凭证。
+[x] 后端只使用经过验证的身份计算配额键。
+[x] 支持浏览器 Cookie。
+[x] 支持 Streamlit 服务端转发身份。
+[ ] 明确反向代理下的 X-Forwarded-For 使用规则。（协议已规定；生产网关和 Uvicorn 配置待联验。）
+[x] 不再直接使用容器内部看到的 Streamlit IP 作为个人身份。
+[x] 日志中不打印完整身份凭证。
+[x] 对身份凭证设置过期策略。
+[x] 匿名身份接口不能暴露配额内容之外的敏感信息。
 Streamlit 适配
 Streamlit 的身份处理应只做：
 
-[ ] 首次启动会话时获取后端匿名凭证。
-[ ] 保存到当前 Streamlit session。
-[ ] 每次问答和额度查询时转发。
-[ ] Streamlit rerun 后仍保持同一会话身份。
-[ ] 失败时重新申请身份，而不是静默生成任意 ID。
+[x] 首次启动会话时获取后端匿名凭证。
+[x] 保存到当前 Streamlit session。
+[x] 每次问答和额度查询时转发。
+[x] Streamlit rerun 后仍保持同一会话身份。
+[x] 失败时重新申请身份，而不是静默生成任意 ID。（仅确定性过期/缺失自动恢复一次；失效或其他错误等待明确重连。）
 deploy 测试
 至少覆盖：
 
-[ ] 两个匿名身份产生两个独立额度。
-[ ] 同一匿名身份多次请求持续累计。
-[ ] Streamlit rerun 不改变身份。
-[ ] 无凭证请求能够获得新身份。
-[ ] 伪造身份凭证被拒绝或被视为新身份。
-[ ] 过期身份按约定处理。
-[ ] ask 和 quota 使用同一身份。
-[ ] 代理转发后不会把所有访客合并。
+[x] 两个匿名身份产生两个独立额度。
+[x] 同一匿名身份多次请求持续累计。
+[x] Streamlit rerun 不改变身份。
+[x] 无凭证请求能够获得新身份。
+[x] 伪造身份凭证被拒绝或被视为新身份。
+[x] 过期身份按约定处理。
+[x] ask 和 quota 使用同一身份。
+[ ] 代理转发后不会把所有访客合并。（模拟同一来源身份隔离通过；真实代理联验待办。）
 第 3 步：deploy 实现个人配额和全站预算
 3.1 重构个人配额
 当前 QuotaManager 使用 IP + User-Agent，需要改为使用第 2 步定义的匿名身份键。
@@ -536,4 +536,6 @@ rag_kb-integration
 
 deploy 先确定“身份、配额、预算和错误如何工作”；integration 再实现“页面如何调用和展示”；最后由 deploy 把两者放到同一生产代理和域名下验证。
 
-下一步：integration 审阅 `anonymous-quota-v1-draft.2` 的固定提交并返回意见或接受回执；deploy 记录双方确认的契约提交并冻结后，再进入第 2 步。第 0 步已归档，第 1 步仍待双方确认；尚未进行匿名身份或配额代码实现。
+当前：双方已确认 `anonymous-quota-v1-draft.2` 正文提交 `0f6ecf2ff2cec29158ea81616d6dbed4480dd67c`，契约已冻结，第 1 步完成；deploy 进入第 2 步匿名身份实现。文档确认不代表功能、故障注入或两套前端联调通过。
+
+第 2 步本地验证：后端全量 `pytest --no-cov -q` 为 439 passed、1 skipped；Streamlit 交互测试另用装有 Streamlit 的解释器运行，5 passed。第 2 步仍需真实代理来源/转发联验、Linux 持久卷及故障注入后才能关闭；第 3 步全站预算与问答准入原子性尚未开始。见 [本地建账与运行说明](step5-anonymous-store-operations.md)。

@@ -135,3 +135,8 @@ git diff --check
 - integration 静态审阅 draft.1 提出两项待定规则：过期 Cookie/Header 的自动恢复次数，以及断电保证所需的目录 fsync、持久卷/初始化状态校验。该审阅不是契约接受回执。
 - deploy 将契约修订为 `anonymous-quota-v1-draft.2`：过期凭证有界恢复且不重放问答；账本以父目录 fsync 为确认边界，显式 bootstrap 与独立预期 UUID/挂载检查阻止丢卷后自动建空账。新增对应后续验收场景。
 - draft.2 待 integration 针对固定提交复审；第 1 步未冻结，第 2 步未开始。以上是契约定义，尚未运行故障注入或功能测试。
+
+## 第 1 步冻结及第 2 步进展（2026-09-28）
+
+- integration 已接受 `anonymous-quota-v1-draft.2`，协议正文固定为 `0f6ecf2ff2cec29158ea81616d6dbed4480dd67c`；[接受回执](receipts/step5-contract-integration-acceptance-2026-09-28.md)由 deploy 归档。该确认只针对文档协议。
+- deploy 已进入匿名身份实现，完成 Header/Cookie 会话、统一身份解析、持久账本、Streamlit 转发与本地定向测试。生产 Linux 挂载与断电故障注入、真实反向代理、多前端联调及全站预算仍待后续验收；目前不应部署为公开服务。

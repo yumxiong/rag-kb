@@ -1,10 +1,10 @@
 # 匿名会话、配额与成本控制共享契约
 
-版本：`anonymous-quota-v1-draft.2`。修订日期：2026-09-28。状态：**deploy 修订提案，待 integration 复审；尚未实现，尚未冻结。** draft.1 提交：`ef1d0f721e3390e595bf81b01ec7bd0acfe76dc8`；本次修订回应过期会话恢复与账本断电持久化两项审阅意见。
+版本：`anonymous-quota-v1-draft.2`。修订日期：2026-09-28。状态：**frozen，双方已确认；功能待实现及验收。** 双方确认的协议正文提交：`0f6ecf2ff2cec29158ea81616d6dbed4480dd67c`，见 [integration 契约接受回执](../deployment/receipts/step5-contract-integration-acceptance-2026-09-28.md)。保留 draft.2 标识以对应确认提交；本次只冻结状态，不改变行为。draft.1 提交：`ef1d0f721e3390e595bf81b01ec7bd0acfe76dc8`。
 
 后端代码基线：`58626e8d6b4df891564590da69865eb4f6795a4b`。第 0 步文档归档提交：`66c38183e53294158efca66d4790489ca51f9112`。协作依据：[基线及接收记录](../deployment/step5-baseline.md)、[integration 回执快照](../deployment/receipts/step5-integration-receipt-2026-09-28.md)。回执只确认第 0 步，不是对本草案的认可。
 
-本文中的“必须”是拟实现的 v1 目标，不是当前 `58626e8` 的行为。双方确认本文的版本和提交后，再执行第 2 步。后台与 Streamlit 可先独立交付；完整 Next 验收与生产首页切换另行推进。
+本文中的“必须”是分步骤实现的 v1 目标，不是后端代码基线 `58626e8` 的行为。双方已冻结本文协议，第 2 步匿名身份在 deploy 中实施；全站预算、完整 Next 验收与生产首页切换另行推进。
 
 ## 1. 核心决定与适用范围
 
@@ -359,14 +359,14 @@ integration 评审重点：Cookie/同源可行性；不共享跨前端身份及�
 当前评审状态：
 
 - [x] deploy 已拟定 draft.1，并按 integration 两项审阅意见修订为 `anonymous-quota-v1-draft.2`。
-- [ ] integration 对 draft.2 及其文档提交返回接受或逐项修改意见；draft.1 的审阅不代表认可。
-- [ ] deploy 合并意见，记录双方确认的同一提交，将状态改为 frozen；有行为变化必须递增版本。
+- [x] integration 接受 draft.2 及固定提交 `0f6ecf2ff2cec29158ea81616d6dbed4480dd67c`，回执已归档。
+- [x] deploy 接受同一提交，状态改为 frozen；有行为变化必须递增版本。
 - [ ] 子步骤 2～5 的代码、自动化测试和 Streamlit 真实验证完成；不能用文档检查代替。
 
-评审未冻结前 integration 仅继续与契约无关的页面工作；草案 mock 标明版本，不视为真实联调。本文的默认数值、随机凭证方案、错误码与路由封禁均为完整可评审提案，没有暗示已有实现或替 integration 提前确认。
+冻结前 integration 仅继续与契约无关的页面工作；草案 mock 标明版本，不视为真实联调。本文的默认数值、随机凭证方案、错误码与路由封禁是双方确认的目标行为；协议确认不等于实现或联调验收。
 
 ### 本轮文档验证（2026-09-28）
 
-已执行 `git diff --check`，使用 Python 标准库核对本文及三份部署文档的 UTF-8、35 个本地文件链接、8 个 fenced JSON 示例和 6 个 Git 提交引用；第 0 步七项完成，第 1 步定义已拟定但双方接受仍待办，第 2 步后没有标记实现完成。回执源文件、归档文件和 `66c3818` 中的 blob 均具有基线记录中的同一 SHA-256。
+第 0 步基线及第 1 步协议正文分别由 `66c38183e53294158efca66d4790489ca51f9112` 和 `0f6ecf2ff2cec29158ea81616d6dbed4480dd67c` 固定。双方接受只确认文档协议；功能、故障注入与前端联调按清单后续步骤验收。
 
-`git diff --exit-code 58626e8d6b4df891564590da69865eb4f6795a4b -- app frontend docker tests scripts docs/demo-v0.1.0` 通过：没有应用实现或验收素材变更。没有运行功能测试、真实模型调用、Docker 或公网验收；这些文档检查不证明目标协议已经可用。
+上述基线差异检查是 draft.2 提交时的文档验证记录；第 2 步开始后代码已发生变更，不能再将其视为当前工作区的检查结果。冻结文档时没有运行真实模型调用、Docker 或公网验收；文档检查不证明目标协议已经可用。
