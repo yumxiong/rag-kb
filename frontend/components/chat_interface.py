@@ -8,6 +8,13 @@ from typing import Optional
 import requests
 import streamlit as st
 
+from frontend.utils.anonymous_session import (
+    AnonymousConnectionError,
+    ensure_identity,
+    identity_headers,
+    recover_identity,
+)
+
 MAX_QUESTION_LENGTH = 2000
 DEFAULT_MAX_SOURCES = 3
 MAX_SOURCES_LIMIT = 5
@@ -34,6 +41,11 @@ class ChatInterface:
 
     def render(self):
         """渲染聊天界面"""
+
+        try:
+            ensure_identity(st.session_state, self.backend_url)
+        except AnonymousConnectionError:
+            st.caption(st.session_state.get("anonymous_error", "暂时无法连接会话。"))
 
         has_messages = bool(st.session_state.messages)
 
@@ -198,7 +210,10 @@ class ChatInterface:
                         suggestion,
                         key=f"suggestion_{i}",
                         use_container_width=True,
-                        disabled=st.session_state.is_processing,
+                        disabled=(
+                            st.session_state.is_processing
+                            or not st.session_state.get("anonymous_token")
+                        ),
                     ):
                         # Demo questions span the corpus, including two-source evidence.
                         st.session_state.selected_doc_id = None
@@ -237,7 +252,10 @@ class ChatInterface:
         # 问题输入（主输入框，最显眼）
         user_question = st.chat_input(
             "向 AtlasDesk 文档提问…",
-            disabled=st.session_state.is_processing,
+            disabled=(
+                st.session_state.is_processing
+                or not st.session_state.get("anonymous_token")
+            ),
             max_chars=MAX_QUESTION_LENGTH,
         )
 
@@ -363,7 +381,7 @@ class ChatInterface:
                             ]
                         ),
                         headers=self._build_byok_headers(),
-                        timeout=30,
+                        timeout=75,
                     )
 
                     if response.status_code == 200:
@@ -395,11 +413,20 @@ class ChatInterface:
                         self._render_feedback(question, answer)
 
                     else:
+                        recovered = recover_identity(
+                            st.session_state, self.backend_url, response
+                        )
                         try:
                             error_detail = response.json().get("detail", "请求失败")
+                            if isinstance(error_detail, dict):
+                                error_detail = error_detail.get(
+                                    "message", "服务暂不可用"
+                                )
                         except ValueError:
                             error_detail = f"服务暂时不可用（HTTP {response.status_code}），请稍后重试"
                         error_msg = f"❌ 处理问题时出错: {error_detail}"
+                        if recovered:
+                            error_msg = "会话已重新连接，请再次主动提交问题。"
                         st.error(error_msg)
 
                         st.session_state.messages.append(
@@ -481,7 +508,7 @@ class ChatInterface:
 
     def _build_byok_headers(self) -> dict:
         """根据侧边栏保存的 BYOK 设置构建请求头（仅保存在本地会话）"""
-        headers = {}
+        headers = identity_headers(st.session_state, self.backend_url)
         try:
             api_key = getattr(st.session_state, "byok_api_key", "").strip()
             provider = getattr(st.session_state, "byok_provider", "").strip()

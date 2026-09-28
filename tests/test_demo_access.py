@@ -15,6 +15,17 @@ from app.main import app
 from app.models.schemas import QuestionResponse, SourceDocument
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def connect_anonymous_client(anonymous_test_store):
+    result = client.post("/api/session/anonymous", json={"transport": "header"})
+    assert result.status_code == 201
+    client.headers["X-Anonymous-Token"] = result.json()["token"]
+    yield
+    client.headers.pop("X-Anonymous-Token", None)
+
+
 SECRET = "demo-test-only-signing-secret-32-bytes"
 MANAGEMENT_ROUTES = [
     ("GET", "/api/documents/"),

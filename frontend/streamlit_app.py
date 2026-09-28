@@ -429,6 +429,19 @@ def clear_user_settings():
 def display_quota_info():
     """以进度条形式展示当日体验额度。"""
     try:
+        from utils.anonymous_session import (
+            identity_headers,
+            ensure_identity,
+            recover_identity,
+        )
+
+        if st.session_state.get("anonymous_error"):
+            st.caption(st.session_state["anonymous_error"])
+            if st.button("重新连接", key="anonymous_reconnect"):
+                ensure_identity(st.session_state, BACKEND_URL_INTERNAL, reconnect=True)
+                st.rerun()
+            return
+        anonymous_headers = identity_headers(st.session_state, BACKEND_URL_INTERNAL)
         if st.session_state.get("settings_status") == SettingsStatus.RESTORING.value:
             st.caption("正在从浏览器恢复设置…")
             return
@@ -447,13 +460,23 @@ def display_quota_info():
 
         response = requests.get(
             f"{BACKEND_URL_INTERNAL}/api/qa/quota",
-            headers=build_byok_headers(),
+            headers={**build_byok_headers(), **anonymous_headers},
             timeout=5,
         )
 
         if response.status_code != 200:
-            st.caption("无法获取配额信息")
-            return
+            if recover_identity(st.session_state, BACKEND_URL_INTERNAL, response):
+                response = requests.get(
+                    f"{BACKEND_URL_INTERNAL}/api/qa/quota",
+                    headers={
+                        **build_byok_headers(),
+                        **identity_headers(st.session_state, BACKEND_URL_INTERNAL),
+                    },
+                    timeout=5,
+                )
+            if response.status_code != 200:
+                st.caption("无法获取配额信息")
+                return
 
         quota_info = response.json()
 
@@ -486,8 +509,8 @@ def display_quota_info():
             unsafe_allow_html=True,
         )
 
-    except Exception as e:
-        st.caption(f"配额信息获取错误: {str(e)}")
+    except Exception:
+        st.caption("暂时无法获取配额信息，请稍后重新连接。")
 
 
 def fetch_public_library() -> dict:
@@ -660,7 +683,9 @@ def render_kb_preview(library: dict):
 def render_byok_advanced():
     """高级设置：自定义 API Key（默认折叠）。"""
     with st.expander("⚙️ 高级 · 使用自己的 API Key", expanded=False):
-        st.caption("配置可保存在浏览器本地；提问时 API Key 会经本站后端发送给所选模型服务。")
+        st.caption(
+            "配置可保存在浏览器本地；提问时 API Key 会经本站后端发送给所选模型服务。"
+        )
         with st.form("byok_form"):
             api_key = st.text_input(
                 "API Key",

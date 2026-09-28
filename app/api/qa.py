@@ -3,11 +3,15 @@
 """
 
 import logging
+import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from app.api.auth import require_admin
+from app.api.anonymous_session import require_identity, store
+from app.core.anonymous_session import SessionError
 from app.core.config import settings
 from app.core.demo_content import DEMO_QUESTIONS
 from app.core.qa_engine import QAEngine
@@ -81,7 +85,11 @@ def _extract_overrides_from_headers(request) -> dict:
 
 
 @router.post("/ask", response_model=QuestionResponse)
-async def ask_question(payload: QuestionRequest, request: Request):
+async def ask_question(
+    payload: QuestionRequest,
+    request: Request,
+    identity: dict = Depends(require_identity),
+):
     """智能问答接口"""
     try:
         if not payload.question.strip():
@@ -113,43 +121,10 @@ async def ask_question(payload: QuestionRequest, request: Request):
         from app.core.config import settings
 
         if settings.enable_quota_limit:
-            from app.core.quota_manager import get_quota_manager
-
-            quota_manager = get_quota_manager()
-
-            # 构建请求信息
-            request_info = {
-                "client_ip": request.client.host if request.client else "unknown",
-                "user_agent": request.headers.get("user-agent", ""),
-            }
-
-            # 检查配额
-            can_use, quota_info = quota_manager.check_and_increment(
-                request_info, has_custom_key
-            )
-
-            if not can_use:
-                return QuestionResponse(
-                    answer=(
-                        f"🚫 **配额已用完**\n\n"
-                        f"您今日的免费提问次数已达上限（{quota_info.daily_limit}次），明天将自动重置。\n\n"
-                        f"💡 **解决方案**：\n"
-                        f"1. 等待明天配额重置\n"
-                        f'2. 在左侧"模型设置(BYOK)"中填写您的API Key，即可无限制使用\n\n'
-                        f"📊 **当前使用情况**：{quota_info.used_count}/{quota_info.daily_limit}"
-                    ),
-                    sources=[],
-                    processing_time=0.0,
+            if not has_custom_key:
+                store(request).personal_count(
+                    identity, increment=True, limit=settings.default_daily_quota
                 )
-
-            # 在响应中添加配额信息（用于前端显示）
-            remaining_quota = max(0, quota_info.daily_limit - quota_info.used_count)
-            logger.info(
-                "User quota: %s/%s, remaining: %s",
-                quota_info.used_count,
-                quota_info.daily_limit,
-                remaining_quota,
-            )
 
         engine = None
         if overrides.get("api_key"):
@@ -275,7 +250,7 @@ async def ask_question(payload: QuestionRequest, request: Request):
 
         return response
 
-    except HTTPException:
+    except (HTTPException, SessionError):
         raise
     except Exception as e:
         logger.error(f"Error in ask_question: {str(e)}")
@@ -480,55 +455,47 @@ async def clear_all_cache(_: dict = Depends(require_admin)):
 
 
 @router.get("/quota")
-async def get_quota_info(request: Request):
+async def get_quota_info(
+    request: Request,
+    response: Response,
+    identity: dict = Depends(require_identity),
+):
     """获取当前用户配额信息"""
     try:
         from app.core.config import settings
-
-        if not settings.enable_quota_limit:
-            return {"quota_enabled": False, "message": "Quota limit is disabled"}
-
-        from app.core.quota_manager import get_quota_manager
-
-        quota_manager = get_quota_manager()
-
-        # 构建请求信息
-        request_info = {
-            "client_ip": request.client.host if request.client else "unknown",
-            "user_agent": request.headers.get("user-agent", ""),
-        }
 
         # 检查是否使用了自定义API Key
         overrides = _extract_overrides_from_headers(request)
         has_custom_key = bool(overrides.get("api_key"))
 
-        if has_custom_key:
-            return {
-                "quota_enabled": True,
-                "has_custom_key": True,
-                "used_count": 0,
-                "daily_limit": "unlimited",
-                "remaining": "unlimited",
-                "message": "Using custom API key - no quota limit",
-            }
-
-        # 获取配额信息
-        quota_info = quota_manager.get_quota_info(request_info)
-        remaining = max(0, quota_info.daily_limit - quota_info.used_count)
-
+        used = store(request).personal_count(identity)
+        limit = (
+            settings.default_daily_quota
+            if (settings.enable_quota_limit and not has_custom_key)
+            else None
+        )
+        now = datetime.now(timezone.utc)
+        reset_at = (
+            (now + timedelta(days=1))
+            .replace(hour=0, minute=0, second=0, microsecond=0)
+            .isoformat()
+            .replace("+00:00", "Z")
+        )
+        request_id = str(uuid.uuid4())
+        response.headers["X-Request-ID"] = request_id
+        response.headers["Cache-Control"] = "no-store"
         return {
-            "quota_enabled": True,
-            "has_custom_key": False,
-            "used_count": quota_info.used_count,
-            "daily_limit": quota_info.daily_limit,
-            "remaining": remaining,
-            "last_reset_date": quota_info.last_reset_date,
-            "message": (
-                f"Using default API key - {remaining}/{quota_info.daily_limit} "
-                "questions remaining today"
-            ),
+            "quota_enabled": settings.enable_quota_limit,
+            "has_custom_key": has_custom_key,
+            "used_count": used,
+            "daily_limit": limit,
+            "remaining": max(0, limit - used) if limit is not None else None,
+            "reset_at": reset_at,
+            "request_id": request_id,
         }
 
+    except SessionError:
+        raise
     except Exception as e:
         logger.error(f"Error getting quota info: {str(e)}")
         raise HTTPException(

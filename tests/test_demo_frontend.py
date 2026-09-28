@@ -1,7 +1,7 @@
 """Streamlit interaction tests with explicit HTTP test doubles, no model calls."""
 
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 import pytest
 
@@ -14,6 +14,18 @@ SCRIPT = """
 from frontend.components.chat_interface import ChatInterface
 ChatInterface('http://demo-test.invalid').render()
 """
+
+TOKEN = "anon_v1_" + "x" * 43
+
+
+def session_response():
+    return response({"token": TOKEN, "expires_at": "2026-10-28T00:00:00Z"}, 201)
+
+
+def session_or_answer(answer):
+    def post(url, **kwargs):
+        return session_response() if url.endswith("/session/anonymous") else answer
+    return post
 
 
 def response(data, status=200):
@@ -36,13 +48,13 @@ def test_example_submits_anonymously_and_preserves_sources():
         ),
     ), patch(
         "requests.post",
-        return_value=response(
+        side_effect=session_or_answer(response(
             {
                 "answer": "网页上传上限为 40 MB。",
                 "sources": sources,
                 "processing_time": 0.1,
             }
-        ),
+        )),
     ) as post:
         at = AppTest.from_string(SCRIPT).run()
         assert not at.exception
@@ -50,11 +62,12 @@ def test_example_submits_anonymously_and_preserves_sources():
         at.session_state.selected_doc_id = "stale-admin-scope"
         at.button(key="suggestion_0").click().run()
         assert not at.exception
-        post.assert_called_once_with(
+        assert post.call_count == 2
+        assert post.call_args == call(
             "http://demo-test.invalid/api/qa/ask",
             json={"question": DEMO_QUESTIONS[0], "max_sources": 3},
-            headers={},
-            timeout=30,
+            headers={"X-Anonymous-Token": TOKEN},
+            timeout=75,
         )
         assert at.session_state.messages[-1]["sources"] == sources
         assert any(e.label == "📚 参考来源" for e in at.expander)
@@ -66,7 +79,9 @@ def test_example_submits_anonymously_and_preserves_sources():
 
 
 def test_unavailable_suggestions_are_not_shown_as_empty_library():
-    with patch("requests.get", return_value=response({}, status=503)):
+    with patch("requests.get", return_value=response({}, status=503)), patch(
+        "requests.post", return_value=session_response()
+    ):
         at = AppTest.from_string(SCRIPT).run()
     assert not at.exception
     assert len(at.warning) == 1
@@ -97,7 +112,7 @@ def test_non_json_gateway_error_recovers_processing_state():
         return_value=response(
             {"suggestions": list(DEMO_QUESTIONS), "document_count": 9}
         ),
-    ), patch("requests.post", return_value=gateway):
+    ), patch("requests.post", side_effect=session_or_answer(gateway)):
         at = AppTest.from_string(SCRIPT).run()
         at.button(key="suggestion_0").click().run()
     assert not at.exception
@@ -121,6 +136,8 @@ def test_full_homepage_is_available_without_login(monkeypatch):
         raise AssertionError(f"Unexpected HTTP request: {url}")
 
     with patch("requests.get", side_effect=get), patch(
+        "requests.post", return_value=session_response()
+    ), patch(
         "utils.settings_loader._read_browser_settings", return_value={}
     ):
         at = AppTest.from_file(str(root / "frontend/streamlit_app.py")).run()

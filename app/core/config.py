@@ -83,7 +83,7 @@ class Settings(BaseSettings):
     # 允许的请求头（含BYOK和SSE）
     allowed_headers: str = (
         "Content-Type,Authorization,LLM-API-Key,LLM-Provider,LLM-Base-URL,"
-        "LLM-Model,Cache-Control,Connection"
+        "LLM-Model,Cache-Control,Connection,X-Anonymous-Token"
     )
 
     # RAG配置
@@ -133,6 +133,11 @@ class Settings(BaseSettings):
     enable_quota_limit: bool = True  # 是否启用配额限制
     default_daily_quota: int = 5  # 默认每日配额（未提供自定义API Key的用户）
     quota_storage_path: str = "./data/quotas"  # 配额数据存储路径
+    anonymous_store_reference: str = ""
+    anonymous_storage_development: bool = False
+    anonymous_mount_path: str = "/app/data"
+    anonymous_mount_source: str = ""
+    anonymous_cookie_secure: bool = True
 
     # jwt认证相关
     jwt_algorithm: str = "HS256"

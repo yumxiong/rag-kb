@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 import jwt
+import pytest
 from fastapi.testclient import TestClient
 from langchain_core.documents import Document
 
@@ -15,6 +16,15 @@ from app.main import app
 from app.models.schemas import SourceDocument
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def connect_anonymous_client(anonymous_test_store):
+    result = client.post("/api/session/anonymous", json={"transport": "header"})
+    assert result.status_code == 201
+    client.headers["X-Anonymous-Token"] = result.json()["token"]
+    yield
+    client.headers.pop("X-Anonymous-Token", None)
 
 
 def _admin_headers() -> dict:
