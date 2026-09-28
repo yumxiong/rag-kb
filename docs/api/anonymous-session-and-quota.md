@@ -1,6 +1,6 @@
 # 匿名会话、配额与成本控制共享契约
 
-版本：`anonymous-quota-v1-draft.1`。拟定日期：2026-09-28。状态：**deploy 提案，待 integration 评审；尚未实现，尚未冻结。**
+版本：`anonymous-quota-v1-draft.2`。修订日期：2026-09-28。状态：**deploy 修订提案，待 integration 复审；尚未实现，尚未冻结。** draft.1 提交：`ef1d0f721e3390e595bf81b01ec7bd0acfe76dc8`；本次修订回应过期会话恢复与账本断电持久化两项审阅意见。
 
 后端代码基线：`58626e8d6b4df891564590da69865eb4f6795a4b`。第 0 步文档归档提交：`66c38183e53294158efca66d4790489ca51f9112`。协作依据：[基线及接收记录](../deployment/step5-baseline.md)、[integration 回执快照](../deployment/receipts/step5-integration-receipt-2026-09-28.md)。回执只确认第 0 步，不是对本草案的认可。
 
@@ -78,7 +78,11 @@ Cookie 模式设置 Cookie，不返回 Header token；Header 模式不设置 Coo
 | 错误格式、摘要未命中、已删除记录 | `401 anonymous_session_invalid` | 同左，不扣额 |
 | Cookie 与 Header 同时存在，或 transport 与现有凭证不匹配 | `400 invalid_request` | 同时存在即 400，即使两者相同也不做优先级猜测 |
 
-Cookie 凭证失效时，后端响应附带同 Path/Domain 的删除 Cookie。会话接口收到无效凭证不能在同一次请求中顺便创建新身份。缺失或过期时前端最多初始化一次；无效凭证显示“会话失效，请重新连接”，只允许用户明确操作后申请一次。再次失败就展示错误，不循环重建。网络、限流、预算、服务端错误不得触发换身份。问答不会因重新初始化而自动重放。
+Cookie 凭证过期或无效时，后端 401 响应附带同 Path/Domain 的删除 Cookie；只有浏览器处理完该响应，下一次会话请求才会不带旧 Cookie。会话接口收到失效凭证绝不在同一次请求中创建新身份。
+
+一次自动恢复流程从首次会话初始化或 `/ask`、`/quota` 的确定性身份错误开始，结束于获得有效会话或显示错误。首次初始化没有凭证时只请求一次；若首次请求携带过期 Cookie 并收到 `anonymous_session_expired`，浏览器等待删除 Cookie 生效后，自动再发**一次**不带凭证的初始化请求，因此最多两次会话请求。若 `/ask` 或 `/quota` 返回 `anonymous_session_required`，或返回 `anonymous_session_expired` 且删除 Cookie 已生效，则只自动发一次初始化请求。第二次初始化仍返回 401、未删除 Cookie，或出现其他错误时停止自动恢复，显示错误；不得循环创建身份。并发组件共用同一个恢复 Promise，rerun/重渲染不重置本轮失败状态。
+
+Streamlit 收到任一接口明确返回 `anonymous_session_expired` 或 `anonymous_session_required` 后，先从当前 `st.session_state` 删除旧 token/expiry，再自动发一次不带 Header 凭证的 `{"transport":"header"}` 初始化；不要求访客额外操作。首次 Header 初始化若意外携带过期 token 并返回 401，也先清除 token，再允许一次无凭证请求，本轮总计最多两次初始化。客户端时钟只能用于提前发起验证，不能单凭本地时间轮换身份。`anonymous_session_invalid` 不自动重建：清除已知失效的本地凭证，提示“会话失效，请重新连接”，仅在访客明确操作后申请一次新身份。网络、限流、预算、来源及服务端错误均不清除凭证或触发换身份；失败后的自动恢复状态保持到明确用户操作或新页面会话，不能靠重渲染重试。恢复身份后只刷新额度，原问答绝不自动重放，访客须主动重新提交。
 
 ### 2.3 Cookie、Header 与来源校验
 
@@ -102,15 +106,16 @@ Cookie 凭证失效时，后端响应附带同 Path/Domain 的删除 Cookie。�
 
 ### 2.4 两条真实请求链路
 
-**Next：** 浏览器访问当前前端 origin → 以 `credentials: 'same-origin'` POST `{"transport":"cookie"}` → 浏览器保存 Set-Cookie → 同源 GET `/api/qa/quota`、POST `/api/qa/ask` 自动携带 Cookie。客户端启动时可调用会话接口复用已有身份，初始化完成前禁用提问；组件重复挂载必须复用同一个初始化 Promise，避免并发创建。跨标签页首次初始化竞争可能留下少量未使用身份；不得因此宣称跨标签页严格只创建一次。
+**Next：** 浏览器访问当前前端 origin → 以 `credentials: 'same-origin'` POST `{"transport":"cookie"}` → 浏览器保存 Set-Cookie → 同源 GET `/api/qa/quota`、POST `/api/qa/ask` 自动携带 Cookie。客户端启动时可调用会话接口复用已有身份，初始化完成前禁用提问；组件重复挂载必须复用同一个初始化/恢复 Promise，避免并发创建。过期 Cookie 按 2.2 节等待删除响应后最多补发一次初始化。跨标签页首次初始化竞争可能留下少量未使用身份；不得因此宣称跨标签页严格只创建一次。
 
 ```javascript
-await fetch('/api/session/anonymous', {
+const sessionResponse = await fetch('/api/session/anonymous', {
   method: 'POST', credentials: 'same-origin',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ transport: 'cookie' })
 });
-// 实际客户端必须检查响应；下面的问答只由用户主动触发。
+// 实际客户端必须检查响应，并按 2.2 节处理过期后的有界恢复。
+// 下面的问答只由用户主动触发。
 await fetch('/api/qa/ask', {
   method: 'POST', credentials: 'same-origin',
   headers: { 'Content-Type': 'application/json' },
@@ -120,7 +125,7 @@ await fetch('/api/qa/ask', {
 
 SSR/BFF 若参与请求，须逐请求转发该浏览器的 Cookie，并将初始化产生的 Set-Cookie 返回给同一浏览器；不能使用跨访客共享 Cookie jar。v1 优先浏览器直连同源 API，暂不引入 BFF。
 
-**Streamlit：** 浏览器连接 Streamlit → 本 session 缺少凭证时，服务端 POST `{"transport":"header"}` → 仅保存响应 token/expiry 至该 `st.session_state` → 额度和问答的服务端请求均带 `X-Anonymous-Token`，连同该 session 的 BYOK 设置。匿名 token 不放进 `st.cache_resource`、全局变量、HTML/JS 或所有访客共用的 `requests.Session()`。
+**Streamlit：** 浏览器连接 Streamlit → 本 session 缺少凭证时，服务端 POST `{"transport":"header"}` → 仅保存响应 token/expiry 至该 `st.session_state` → 额度和问答的服务端请求均带 `X-Anonymous-Token`，连同该 session 的 BYOK 设置。收到明确过期/缺失错误时按 2.2 节清除 token 并自动申请一次，保持 rerun 间的失败状态，不自动重发问答。匿名 token 不放进 `st.cache_resource`、全局变量、HTML/JS 或所有访客共用的 `requests.Session()`。
 
 正常 rerun 保持身份；Streamlit 浏览器刷新、断连后新建 session 或进程重启可能丢失 token，此时创建新身份。后端正常重启不会让仍由前端持有的 token 失效。返回给 Streamlit Python 的 Set-Cookie 不会到达访客浏览器，因此此链路明确使用 Header，不声称浏览器 Cookie 已共享。两套前端间切换可能有两份个人额度，全站预算始终共用。
 
@@ -252,11 +257,13 @@ v1 的“全站预算”指全部公共问答流量，不声称可限制同一�
 
 ## 6. 持久化、管理与恢复
 
-拟沿用 `QUOTA_STORAGE_PATH`（默认 `./data/quotas`），新的统一账本 `quota-state-v1.json` 包含版本、身份摘要/期限、日期分区、个人计数、全站分类计数。所有会话创建与准入/模型记账在同一进程锁保护下更新：构造新状态 → 同目录临时文件 → flush/fsync → 原子 replace → 更新内存。线程中的计费调用必须使用同一实例和锁，不读写独立缓存副本。
+拟沿用 `QUOTA_STORAGE_PATH`（默认 `./data/quotas`），新的统一账本 `quota-state-v1.json` 包含版本、存储实例 UUID、身份摘要/期限、日期分区、个人计数、全站分类计数。所有会话创建与准入/模型记账在同一进程锁保护下更新：构造新状态 → 在账本同目录创建临时文件 → flush 并 fsync 临时文件 → 原子 replace 账本 → fsync 账本父目录 → 更新内存并确认成功。**目录 fsync 完成才是提交边界**；在此之前不得发放新 token、向客户端确认准入或发起外部调用。任一步失败，包括 replace 后目录 fsync 失败，结果视为持久化状态不确定：关闭计费服务，返回 `503 quota_storage_unavailable`，禁止外部调用；重启后核验账本，不凭响应失败自动回滚计数。线程中的计费调用必须使用同一实例和锁，不读写独立缓存副本。
 
 首版保证单容器单 worker；启动持有存储目录独占锁，第二个进程使用同目录时启动失败。生产配置显式 worker=1、replica=1，不滚动双实例共写，不使用多机共享文件系统。未来多副本须迁移到带事务的数据库/Redis 并重新验收，单机文件锁不是跨主机一致性保证。
 
-首次建账必须显式初始化，并持久化初始化标记；已初始化目录账本丢失、损坏、版本不支持、目录不可写或持久化失败均 fail closed，禁止自动返回空表重新赠送额度。读取身份/额度不能确定正确状态时返回 `503 quota_storage_unavailable`；运营修复前禁用问答。无凭证的 `/health` 可报告 degraded，但不暴露文件路径。重启/断电后计数不低于已确认持久化的准入记录；落盘成功却未调用模型允许保守多计。
+首次建账只允许停服状态的显式 bootstrap 工具/作业执行，运行时永不自动初始化。生产部署须提供**独立于配额持久卷**的预期存储实例 UUID 配置，并在启动时验证预期持久卷确已挂载（默认路径需验证 `/app/data` 的实际挂载来源，而非只检查 `./data/quotas` 目录存在）。bootstrap 为账本及初始化标记写入同一 UUID，分别按临时文件 fsync、原子替换、父目录 fsync 持久化；完成后才将独立预期 UUID 配置持久化并允许服务启动。任何中途失败均视为未完成，需运营核对，不可盲目重复初始化。预期 UUID 配置、挂载、标记和账本必须同时存在且 UUID 一致；其中任一缺失、损坏、版本不支持、目录不可写，或挂载到错误卷，启动直接拒绝（非零退出、不开公共 API）。因此即使标记与账本同时丢失或持久卷未挂载，也不能被当作首次建账。
+
+生产断电保证仅适用于支持同目录原子替换、文件及父目录 fsync 且实际存储遵守持久化语义的单机 Linux 文件系统；不支持目录 fsync 的环境不得以此模式启动生产服务。本地 Windows 调试不据此宣称断电保证。完成提交边界的准入记录在重启/断电后不得减少；replace 后、目录 fsync 前崩溃可能读到旧或新状态，但此时尚未确认准入或发起付费调用。启动时核验持久化状态及约束，运营修复前禁用问答；运行中读取身份/额度不能确定正确状态时返回 `503 quota_storage_unavailable`，`/health` 可报告 degraded 但不暴露文件路径。独立 UUID 只能防止空目录/错卷误建账，不能证明整卷旧快照没有回退；旧账本恢复仍按下一段保守处理。落盘成功却未调用模型允许保守多计。
 
 恢复/回滚不得直接恢复较旧且计数更少的账本继续开放服务。先停问答，核对当日已消耗数据，不能确定时把当日预算置为耗尽直到下一个 UTC 日或人工确认保守余额；不要靠切换旧版本代码重新启用无预算入口。身份和账本挂载持久卷，发布镜像不能覆盖。
 
@@ -308,7 +315,7 @@ Nginx 与应用的窗口/计数各自独立，任何一层拒绝都以错误码�
 | HTTP | code | 展示/后续动作 |
 | --- | --- | --- |
 | 400 | `invalid_request` | 修改输入或配置；不重试原请求 |
-| 401 | `anonymous_session_required` / `anonymous_session_expired` | 至多初始化一次；提示用户再次主动提交 |
+| 401 | `anonymous_session_required` / `anonymous_session_expired` | 按 2.2 节清凭证并有界自动恢复；首次过期 Cookie 初始化最多两次会话请求；不自动重放问答 |
 | 401 | `anonymous_session_invalid` | 明确提示重新连接；不静默轮换身份 |
 | 401 / 403 | `admin_auth_required` / `admin_forbidden` | 管理端身份无效/权限不足，不触发匿名身份重建 |
 | 403 | `origin_not_allowed` / `feature_disabled` | 来源不允许/当前 Demo 未开放该操作 |
@@ -336,12 +343,13 @@ Nginx 与应用的窗口/计数各自独立，任何一层拒绝都以错误码�
 | --- | --- |
 | 两个浏览器上下文/两个 Streamlit session | 同后端、不同身份、个人额度分别累计；每个 session rerun 身份不变 |
 | 同一 token Cookie 与 Header 分别调用 | 分开请求使用同一摘要计数；同时发送两种凭证被拒绝；Cookie 不可通过切换 transport 导出 |
-| 过期、伪造、丢失与服务重启 | 严格按身份表处理；没有换身份死循环；正常重启保留账本 |
+| 过期、伪造、丢失与服务重启 | 首次过期 Cookie 请求先 401 删除 Cookie、再自动无凭证初始化成功，总计两次；Streamlit 过期 Header 清除后自动申请一次；无效身份仅手动重连；失败/rerun 不循环；问答不重放；正常重启保留账本 |
 | 默认 key 第 6 次、BYOK 切换、相同问题缓存 | 5 次准入后 429；BYOK 免个人但仍计全站；缓存计请求，不虚增未发生的聊天调用 |
 | 最后一个额度/预算单位的并发竞争 | 原子准入，无负数和超发；另一请求拒绝时不只扣个人而漏扣全站 |
 | 上游失败、deadline、断连、SDK 重试 | 准入失败计数规则一致；没有隐式重试；任务未退出不释放问答槽位；已记尝试不退款 |
 | 多次检索 Embedding、BYOK、匿名 search、付费探针 | 每个外部尝试受闸门控制；旁路被禁用；BYOK 不绕过站点 Embedding 上限 |
-| 午夜、损坏/写失败、恢复旧账本、双 worker | UTC 分日；存储 fail closed；恢复不减少未知消费；第二进程拒绝启动 |
+| 午夜、损坏/写失败、恢复旧账本、双 worker | UTC 分日；故障注入验证临时文件 fsync、replace、目录 fsync 各阶段，确认前无外部调用；存储 fail closed；第二进程拒绝启动 |
+| 首次建账、断电与持久卷缺失 | 显式 bootstrap 后才启动；独立 UUID、卷挂载、标记、账本逐项校验；两文件同时丢失、错卷、部分 bootstrap 或目录 fsync 不可用均拒绝启动；重启后已确认计数不降，旧快照须人工保守恢复 |
 | Nginx + Streamlit 内部直连 + Next 同源 | 两条链路都受保护；分别触发 429/503/502/504；前端不暴露内部地址 |
 | HTML 网关错误、跨站 POST、管理 JWT | UI 正确降级；Origin 拒绝；管理员与匿名权限隔离 |
 | 第 4 步 5 道问题、引用与 UI | 新边界下示例和完整引用仍通过，文档数/名称来自真实后端 |
@@ -350,8 +358,8 @@ integration 评审重点：Cookie/同源可行性；不共享跨前端身份及�
 
 当前评审状态：
 
-- [x] deploy 已拟定 `anonymous-quota-v1-draft.1`，覆盖第 1 步所有定义项与回执的六类问题。
-- [ ] integration 对本草案版本及其文档提交返回接受或逐项修改意见。
+- [x] deploy 已拟定 draft.1，并按 integration 两项审阅意见修订为 `anonymous-quota-v1-draft.2`。
+- [ ] integration 对 draft.2 及其文档提交返回接受或逐项修改意见；draft.1 的审阅不代表认可。
 - [ ] deploy 合并意见，记录双方确认的同一提交，将状态改为 frozen；有行为变化必须递增版本。
 - [ ] 子步骤 2～5 的代码、自动化测试和 Streamlit 真实验证完成；不能用文档检查代替。
 

@@ -2,7 +2,7 @@
 
 执行记录（2026-09-28）：第 0 步已完成，见 [基线文档](step5-baseline.md)及 [integration 回执快照](receipts/step5-integration-receipt-2026-09-28.md)。后端基线为 `58626e8d6b4df891564590da69865eb4f6795a4b`；integration 已确认边界但未同步代码，契约确定前仅开展独立页面工作。第 1 步进入拟定阶段，后续实现尚未开始。本清单不属于上述代码基线提交，随第 0 步文档独立归档。
 
-第 0 步文档归档：`66c38183e53294158efca66d4790489ca51f9112`。第 1 步产物：[共享契约草案](../api/anonymous-session-and-quota.md)，版本 `anonymous-quota-v1-draft.1`，待 integration 评审。本节下方第 1 步 `[x]` 表示已在草案定义，不表示双方已冻结或功能已实现；冲突时以该版本草案为评审正文，原建议仅作为任务背景。
+第 0 步文档归档：`66c38183e53294158efca66d4790489ca51f9112`。第 1 步产物：[共享契约草案](../api/anonymous-session-and-quota.md)，当前版本 `anonymous-quota-v1-draft.2`。integration 对 draft.1（`ef1d0f721e3390e595bf81b01ec7bd0acfe76dc8`）提出过期会话恢复与断电持久化两项修改意见，deploy 已据此修订，待 integration 复审 draft.2。本节下方第 1 步 `[x]` 表示已在草案定义，不表示双方已冻结或功能已实现；冲突时以当前草案为评审正文，原建议仅作为任务背景。
 
 第 0 步：冻结协作边界和当前基线
 deploy 执行
@@ -158,7 +158,7 @@ Cookie/Header 约定；
 示例请求与响应；
 已知限制。
 完成标准
-[ ] deploy 和 integration 都认可同一份契约。（draft.1 待 integration 评审；第 0 步回执不代表认可本草案。）
+[ ] deploy 和 integration 都认可同一份契约。（draft.1 已获两项修改意见；draft.2 待 integration 复审；第 0 步回执不代表认可契约。）
 [x] integration 不再自行设计另一套身份或配额协议。（已在第 0 步回执接受该边界；当前仍只做独立页面工作。）
 [x] deploy 后续代码修改都有明确目标。（草案已定义目标；双方冻结后才进入第 2 步。）
 第 2 步：deploy 实现匿名身份
@@ -536,4 +536,4 @@ rag_kb-integration
 
 deploy 先确定“身份、配额、预算和错误如何工作”；integration 再实现“页面如何调用和展示”；最后由 deploy 把两者放到同一生产代理和域名下验证。
 
-下一步：integration 审阅 anonymous-quota-v1-draft.1 并返回意见或接受回执；deploy 更新并记录双方确认的契约提交，再进入第 2 步。第 0 步已归档，第 1 步草案已拟定；尚未进行匿名身份或配额代码实现。
+下一步：integration 审阅 `anonymous-quota-v1-draft.2` 的固定提交并返回意见或接受回执；deploy 记录双方确认的契约提交并冻结后，再进入第 2 步。第 0 步已归档，第 1 步仍待双方确认；尚未进行匿名身份或配额代码实现。

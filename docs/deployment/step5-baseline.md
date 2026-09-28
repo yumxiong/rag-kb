@@ -109,7 +109,7 @@
 
 1. 第 5 步后端开发统一参考 `58626e8d6b4df891564590da69865eb4f6795a4b`。integration 当前仍在 `82d5037`，本次没有替它合并或移动 HEAD。
 2. 若 integration 需要提前同步第 4 步能力，应在保存自身工作后合并固定的 `58626e8`，或按依赖顺序 cherry-pick `61d784e`、`58626e8`。不要仅挑后一个提交而遗漏语料/配置前置改动；以上是后续操作约定，本次未执行。
-3. 子步骤 1 的目标契约为 `docs/api/anonymous-session-and-quota.md`，在 2026-09-27 冻结基线时尚未创建。2026-09-28 已拟定 [draft.1](../api/anonymous-session-and-quota.md)，待 integration 评审，尚未定稿。Cookie/Token 格式、期限、扣额退款、BYOK、预算阈值、时区和错误码以双方确认的契约为准；清单中的示例不是现有 API 保证。
+3. 子步骤 1 的目标契约为 `docs/api/anonymous-session-and-quota.md`，在 2026-09-27 冻结基线时尚未创建。2026-09-28 draft.1 提交后收到 integration 两项修改意见，现修订为 [draft.2](../api/anonymous-session-and-quota.md)，待 integration 复审，尚未定稿。Cookie/Token 格式、期限、扣额退款、BYOK、预算阈值、时区和错误码以双方确认的契约为准；清单中的示例不是现有 API 保证。
 4. deploy 在子步骤 2～5 实现并验证，子步骤 6 用确定提交和 `docs/deployment/step5-handoff.md` 交接；integration 再进行子步骤 7～8 的新协议接入/验收，并返回确定前端提交、后端版本及验证记录。
 5. integration 通过 merge/cherry-pick 接收确定提交，记录来源 SHA 和本地结果 SHA。冲突保留已确认的后端规则并适配客户端；不能复制另一 worktree 的未提交文件作为共享版本。
 6. 各工作区使用独立测试端口和运行数据。`.env`、secrets、密钥、管理员令牌、Cookie 原文、索引、缓存和额度文件不通过提交交接；验收报告只保留必要且脱敏的信息。
