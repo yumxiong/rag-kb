@@ -1,0 +1,2 @@
+# Preserve the original receipt bytes so archived SHA-256 remains reproducible.
+*.md -text
