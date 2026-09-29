@@ -8,6 +8,11 @@ from typing import List
 from langchain_core.embeddings import Embeddings
 
 from app.core.cache_manager import cache_manager
+from app.core.global_budget import (
+    record_provider_attempt,
+    require_document_provider_access,
+    require_query_context,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +46,7 @@ class CachedEmbeddings(Embeddings):
 
         # 批量获取未缓存的嵌入
         if texts_to_embed:
+            require_document_provider_access()
             logger.info(
                 f"Generating embeddings for {len(texts_to_embed)}/{len(texts)} texts"
             )
@@ -58,6 +64,7 @@ class CachedEmbeddings(Embeddings):
 
     def embed_query(self, text: str) -> List[float]:
         """嵌入单个查询"""
+        require_query_context()
         # 检查缓存
         cached_embedding = cache_manager.get_embedding_cache(text, self.model_name)
         if cached_embedding is not None:
@@ -67,6 +74,7 @@ class CachedEmbeddings(Embeddings):
 
         # 生成新的嵌入
         logger.debug("Generating new embedding for query")
+        record_provider_attempt("query_embedding")
         embedding = self.base_embeddings.embed_query(text)
         self.api_calls += 1
 

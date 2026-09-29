@@ -14,9 +14,11 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Up
 from fastapi.responses import StreamingResponse
 
 from app.api.auth import require_admin
+from app.core.anonymous_session import SessionError
 from app.core.async_processor import async_processor
 from app.core.config import settings
 from app.core.document_processor import DocumentProcessor
+from app.core.global_budget import require_document_maintenance
 from app.core.job_status import job_status
 from app.core.vector_store import VectorStore
 from app.models.schemas import Document
@@ -38,7 +40,13 @@ def get_vector_store():
     return vector_store
 
 
-@router.post("/upload-async")
+def require_maintenance_admin(admin: dict = Depends(require_admin)) -> dict:
+    """Authenticate first, then enforce the document maintenance window."""
+    require_document_maintenance()
+    return admin
+
+
+@router.post("/upload-async", dependencies=[Depends(require_maintenance_admin)])
 async def upload_document_async(
     file: UploadFile = File(...), _: dict = Depends(require_admin)
 ):
@@ -107,14 +115,14 @@ async def upload_document_async(
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except HTTPException:
+    except (HTTPException, SessionError):
         raise
     except Exception as e:
         logger.error(f"Upload failed: {str(e)}")
         raise HTTPException(status_code=500, detail="Upload failed")
 
 
-@router.post("/upload")
+@router.post("/upload", dependencies=[Depends(require_maintenance_admin)])
 async def upload_document(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
@@ -227,6 +235,7 @@ async def upload_document(
 
             if result["status"] == "completed":
                 # 添加到向量存储
+                require_document_maintenance()
                 get_vector_store().add_documents(result["chunks"])
                 doc_record.status = "completed"
                 doc_record.chunk_count = result["chunk_count"]
@@ -258,7 +267,7 @@ async def upload_document(
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except HTTPException:
+    except (HTTPException, SessionError):
         raise
     except Exception as e:
         logger.error(f"Error uploading document: {str(e)}")
@@ -273,6 +282,7 @@ async def process_document_background(
 ):
     """后台处理文档"""
     try:
+        require_document_maintenance()
         logger.info(f"Processing document: {filename} (job_id: {job_id})")
         try:
             if job_id:
@@ -321,6 +331,7 @@ async def process_document_background(
                     chunk.metadata["job_id"] = job_id
 
             # 添加到向量存储
+            require_document_maintenance()
             get_vector_store().add_documents(result["chunks"])
             logger.info(
                 f"Document {filename} processed successfully "
@@ -611,7 +622,7 @@ async def delete_document(document_id: str, _: dict = Depends(require_admin)):
         )
 
 
-@router.post("/batch-upload")
+@router.post("/batch-upload", dependencies=[Depends(require_maintenance_admin)])
 async def batch_upload_documents(
     background_tasks: BackgroundTasks,
     files: List[UploadFile] = File(...),

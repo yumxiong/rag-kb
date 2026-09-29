@@ -9,7 +9,14 @@ from unittest.mock import Mock, patch
 import pytest
 from langchain_core.documents import Document
 
+from app.core.global_budget import offline_provider_access
 from app.core.vector_store import VectorStore
+
+
+@pytest.fixture(autouse=True)
+def offline_scope():
+    with offline_provider_access(reason="isolated vector store unit tests"):
+        yield
 
 
 class TestVectorStore:
@@ -114,7 +121,10 @@ class TestVectorStore:
 
             # 验证OpenAIEmbeddings被正确调用
             mock_openai_embeddings.assert_called_once_with(
-                api_key="test-embedding-key", model="text-embedding-ada-002"
+                api_key="test-embedding-key",
+                model="text-embedding-ada-002",
+                max_retries=0,
+                check_embedding_ctx_length=False,
             )
 
             # 验证CachedEmbeddings被创建（新实现包含 base URL 后缀）

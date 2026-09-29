@@ -2,10 +2,18 @@
 
 from unittest.mock import Mock, patch
 
+import pytest
 from langchain_core.documents import Document
 
 from app.core.config import settings
+from app.core.global_budget import offline_provider_access
 from app.core.qa_engine import EvidenceRetriever, QAEngine
+
+
+@pytest.fixture(autouse=True)
+def offline_scope():
+    with offline_provider_access(reason="isolated retrieval unit tests"):
+        yield
 
 
 def test_nearest_evidence_survives_diversity_and_duplicates():
@@ -24,6 +32,7 @@ def test_disabled_cache_and_empty_answer(monkeypatch):
     monkeypatch.setattr(settings, "enable_qa_cache", False)
     engine = QAEngine.__new__(QAEngine)
     engine.vector_store = Mock()
+    engine.vector_store.as_retriever.return_value.invoke.return_value = []
     engine._effective_model_config = settings.get_model_config()
     engine.get_relevant_documents = Mock(return_value=[])
     chain = Mock()

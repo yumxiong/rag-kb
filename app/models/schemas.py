@@ -48,11 +48,14 @@ class DocumentChunk(BaseModel):
 class QuestionRequest(BaseModel):
     """问答请求模型"""
 
+    model_config = {"extra": "forbid"}
+
     question: str = Field(
         ..., min_length=1, max_length=2000, description="用户提问内容"
     )
     max_sources: Optional[int] = Field(
         default=settings.max_sources,
+        strict=True,
         ge=settings.min_source_limit,
         le=settings.max_source_limit,
         description="返回的来源文档数量",
@@ -107,6 +110,7 @@ class QuestionResponse(BaseModel):
     sources: List[SourceDocument]
     processing_time: float
     from_cache: Optional[bool] = False
+    request_id: Optional[str] = None
 
 
 class ApiResponse(BaseModel):

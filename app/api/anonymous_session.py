@@ -87,6 +87,14 @@ async def session_error_handler(request: Request, error: SessionError):
         "anonymous_session_invalid": "会话失效，请重新连接。",
         "quota_storage_unavailable": "服务暂不可用，请稍后再试。",
         "quota_exceeded": "今日免费提问次数已用完。",
+        "global_budget_exceeded": "今日服务预算已用完。",
+        "service_busy": "服务繁忙，请稍后再试。",
+        "service_unavailable": "服务暂不可用。",
+        "upstream_error": "上游服务处理失败，请稍后再试。",
+        "quota_not_found": "未找到该额度记录。",
+        "knowledge_base_unavailable": "知识库暂不可用。",
+        "feature_disabled": "此功能暂不可用。",
+        "internal_error": "服务处理失败，请稍后再试。",
         "rate_limited": "请求过于频繁，请稍后再试。",
         "origin_not_allowed": "请求来源不允许。",
         "invalid_request": "请求格式或凭证传输方式不正确。",
@@ -97,10 +105,12 @@ async def session_error_handler(request: Request, error: SessionError):
         "request_id": request_id,
     }
     headers = {"X-Request-ID": request_id, "Cache-Control": "no-store"}
-    if error.status == 429:
+    if error.retry_after is not None:
         wait = error.retry_after or 60
         detail["retry_after_seconds"] = wait
         headers["Retry-After"] = str(wait)
+    if error.code in ("quota_exceeded", "global_budget_exceeded"):
+        detail["reset_at"] = store(request).reset_at()
     response = JSONResponse(
         {"detail": detail}, status_code=error.status, headers=headers
     )

@@ -8,6 +8,8 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 
 from fastapi import FastAPI, HTTPException
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.anonymous_session import SessionRateLimit
@@ -43,6 +45,7 @@ async def lifespan(app: FastAPI):
         and not settings.anonymous_cookie_secure
     ):
         raise RuntimeError("Production anonymous cookies require Secure")
+    settings.budget_limits()
     app.state.anonymous_store = AnonymousSessionStore(
         settings.quota_storage_path,
         settings.anonymous_store_reference,
@@ -73,6 +76,24 @@ app = FastAPI(
 
 limiter.app = app
 app.add_exception_handler(SessionError, session_error_handler)
+
+
+@app.exception_handler(RequestValidationError)
+async def contract_validation_error_handler(request, error):
+    """Return a redacted input error for the anonymous budget contract."""
+    if request.url.path in {
+        "/api/session/anonymous",
+        "/api/qa/ask",
+        "/api/qa/quota",
+        "/api/qa/quota/reset",
+        "/api/qa/quota/stats",
+        "/api/qa/budget",
+    }:
+        return await session_error_handler(
+            request, SessionError("invalid_request", 400)
+        )
+    return await request_validation_exception_handler(request, error)
+
 
 # 并发保护（注意：中间件后注册的先执行，所以并发限制放在 CORS 之后注册）
 app.add_middleware(

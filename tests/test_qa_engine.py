@@ -7,8 +7,15 @@ from unittest.mock import Mock, patch
 import pytest
 from langchain_core.documents import Document
 
+from app.core.global_budget import offline_provider_access
 from app.core.qa_engine import QAEngine
 from app.models.schemas import QuestionResponse, SourceDocument
+
+
+@pytest.fixture(autouse=True)
+def offline_scope():
+    with offline_provider_access(reason="isolated engine unit tests"):
+        yield
 
 
 class TestQAEngine:
@@ -18,7 +25,7 @@ class TestQAEngine:
     def mock_vector_store(self):
         """模拟向量存储"""
         vector_store = Mock()
-        vector_store.as_retriever.return_value = Mock()
+        vector_store.as_retriever.return_value = Mock(invoke=Mock(return_value=[]))
         vector_store.similarity_search.return_value = [
             Document(
                 page_content="这是测试内容1",
@@ -365,7 +372,7 @@ class TestQAEngineIntegration:
 
         # 模拟向量存储
         mock_vector_store = Mock()
-        mock_vector_store.as_retriever.return_value = Mock()
+        mock_vector_store.as_retriever.return_value = Mock(invoke=Mock(return_value=[]))
         mock_vector_store.similarity_search.return_value = [
             Document(page_content="相关内容", metadata={"filename": "test.txt"})
         ]

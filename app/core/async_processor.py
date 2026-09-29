@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, Optional
 
 from app.core.exceptions import CancellationError
+from app.core.global_budget import require_document_maintenance
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ class AsyncDocumentProcessor:
         content_hash: Optional[str] = None,
     ) -> str:
         """提交处理任务"""
+        require_document_maintenance()
         # 创建取消标志
         cancel_event = threading.Event()
 
@@ -232,6 +234,7 @@ class AsyncDocumentProcessor:
             from app.core.job_status import job_status
             from app.core.vector_store import get_vector_store
 
+            require_document_maintenance()
             logger.info(f"Starting processing for {filename}")
 
             # 检查点 1: 开始前检查
@@ -335,6 +338,7 @@ class AsyncDocumentProcessor:
                     chunk.metadata["job_id"] = job_id
 
                 job_status.mark_processing(job_id, progress=80, message="生成向量嵌入")
+                require_document_maintenance()
                 get_vector_store().add_documents(chunks)
 
                 # 最后检查点: 完成前检查

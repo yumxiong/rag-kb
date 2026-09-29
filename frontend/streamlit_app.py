@@ -6,7 +6,6 @@ import json
 import logging
 import os
 import subprocess
-import time
 import uuid
 from datetime import datetime
 
@@ -67,7 +66,7 @@ def detect_provider_from_api_key(api_key: str) -> str:
 
 # 尝试导入streamlit-js-eval，如果没有则使用备用方案
 try:
-    from streamlit_js_eval import get_geolocation, streamlit_js_eval
+    from streamlit_js_eval import streamlit_js_eval
 
     JS_EVAL_AVAILABLE = True
 except ImportError:
@@ -80,7 +79,6 @@ from components.chat_interface import ChatInterface
 from components.file_upload import FileUploadComponent
 from utils.settings_loader import SettingsStatus
 from utils.settings_loader import load_user_settings as load_user_settings_shared
-from utils.state_manager import StateManager
 
 # 配置页面
 st.set_page_config(
@@ -430,8 +428,8 @@ def display_quota_info():
     """以进度条形式展示当日体验额度。"""
     try:
         from utils.anonymous_session import (
-            identity_headers,
             ensure_identity,
+            identity_headers,
             recover_identity,
         )
 
@@ -444,18 +442,6 @@ def display_quota_info():
         anonymous_headers = identity_headers(st.session_state, BACKEND_URL_INTERNAL)
         if st.session_state.get("settings_status") == SettingsStatus.RESTORING.value:
             st.caption("正在从浏览器恢复设置…")
-            return
-
-        if st.session_state.get("byok_api_key"):
-            st.markdown(
-                """
-                <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:10px 12px;">
-                  <div style="font-size:13px;color:#065f46;font-weight:600;">🔑 已接入自定义 API Key</div>
-                  <div style="font-size:12px;color:#047857;margin-top:2px;">不受试用配额限制</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
             return
 
         response = requests.get(
@@ -478,36 +464,9 @@ def display_quota_info():
                 st.caption("无法获取配额信息")
                 return
 
-        quota_info = response.json()
+        from utils.quota_display import render_quota_info
 
-        if not quota_info.get("quota_enabled", True):
-            st.caption("当前未启用配额限制")
-            return
-
-        used = int(quota_info.get("used_count", 0) or 0)
-        limit_raw = quota_info.get("daily_limit", 0)
-        try:
-            limit = int(limit_raw)
-        except (TypeError, ValueError):
-            limit = 0
-        remaining = max(limit - used, 0)
-        ratio = (used / limit) if limit > 0 else 0.0
-
-        st.markdown(
-            f"""
-            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;">
-              <div style="display:flex;justify-content:space-between;align-items:baseline;">
-                <span style="font-size:13px;color:#475569;font-weight:600;">🎁 今日免费体验额度</span>
-                <span style="font-size:12px;color:#64748b;">{used} / {limit}</span>
-              </div>
-              <div style="margin-top:8px;height:6px;background:#e2e8f0;border-radius:999px;overflow:hidden;">
-                <div style="width:{min(ratio*100, 100):.1f}%;height:100%;background:linear-gradient(90deg,#6366f1,#8b5cf6);"></div>
-              </div>
-              <div style="margin-top:8px;font-size:12px;color:#64748b;">剩余 <b style="color:#6366f1;">{remaining}</b> 次 · 超额可在「⚙️ 高级」中接入自己的 Key</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        render_quota_info(response.json(), st)
 
     except Exception:
         st.caption("暂时无法获取配额信息，请稍后重新连接。")
@@ -837,7 +796,6 @@ def main():
 
     # 提前获取一次公开知识库目录（供 hero 与 chat 共用）
     library = fetch_public_library()
-    doc_count = library.get("total", 0)
     st.session_state["_public_library"] = library  # ChatInterface 可读取
 
     # ===== 侧边栏 =====

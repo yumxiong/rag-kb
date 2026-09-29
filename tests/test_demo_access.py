@@ -120,6 +120,7 @@ def test_admin_login_and_document_access(monkeypatch):
 
 
 def test_anonymous_demo_question_and_citations(monkeypatch):
+    monkeypatch.setattr(settings, "anonymous_storage_development", True)
     monkeypatch.setattr(settings, "enable_quota_limit", False)
     root = Path(__file__).resolve().parents[1]
     questions = json.loads(

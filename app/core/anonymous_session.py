@@ -3,6 +3,7 @@
 import copy
 import hashlib
 import json
+import math
 import os
 import re
 import secrets
@@ -15,6 +16,14 @@ from pathlib import Path
 
 TOKEN_PATTERN = re.compile(r"anon_v1_[A-Za-z0-9_-]{43}\Z")
 SESSION_LIFETIME = 2_592_000
+BUDGET_KEYS = (
+    "ask_default",
+    "ask_byok",
+    "llm_default",
+    "llm_byok",
+    "query_embedding_default",
+    "query_embedding_byok",
+)
 
 
 class SessionError(Exception):
@@ -205,6 +214,11 @@ class AnonymousSessionStore:
                 raise ValueError("Invalid lifetime")
         for day, record in state["days"].items():
             datetime.strptime(day, "%Y-%m-%d")
+            budget = record.setdefault("budget", {})
+            if not isinstance(budget, dict) or set(budget) - set(BUDGET_KEYS):
+                raise ValueError("Invalid budget")
+            if any(type(value) is not int or value < 0 for value in budget.values()):
+                raise ValueError("Invalid budget count")
             for group in ("personal", "session_ip"):
                 if not isinstance(record[group], dict):
                     raise ValueError("Invalid daily counts")
@@ -301,4 +315,124 @@ class AnonymousSessionStore:
 
     def seconds_until_reset(self) -> int:
         """UTC day boundary shared by daily admission failures."""
-        return max(1, int(86400 - self.clock() % 86400))
+        return max(1, math.ceil(86400 - self.clock() % 86400))
+
+    def reset_at(self) -> str:
+        return datetime.fromtimestamp(
+            (int(self.clock()) // 86400 + 1) * 86400, timezone.utc
+        ).strftime("%Y-%m-%dT00:00:00Z")
+
+    def _budget(self, state: dict) -> dict:
+        return self._daily(state).setdefault("budget", {})
+
+    @staticmethod
+    def _exhausted(budget: dict, byok: bool, limits: dict) -> bool:
+        return any(
+            budget.get(f"{kind}_default", 0) + budget.get(f"{kind}_byok", 0)
+            >= limits[kind]
+            for kind in ("ask", "llm", "query_embedding")
+        ) or (not byok and budget.get("llm_default", 0) >= limits["default_llm"])
+
+    def admit(
+        self, identity: dict, *, byok: bool, personal_limit: int | None, limits: dict
+    ) -> None:
+        """Check all daily gates and commit both counters in one transaction."""
+        with self._lock:
+            self._ensure_healthy()
+            state = copy.deepcopy(self.state)
+            daily = self._daily(state)
+            budget = daily.setdefault("budget", {})
+            digest = identity["quota_ref"]
+            count = daily["personal"].get(digest, 0)
+            if not byok and personal_limit is not None and count >= personal_limit:
+                raise SessionError("quota_exceeded", 429, self.seconds_until_reset())
+            if self._exhausted(budget, byok, limits):
+                raise SessionError(
+                    "global_budget_exceeded", 503, self.seconds_until_reset()
+                )
+            if not byok:
+                daily["personal"][digest] = count + 1
+            key = "ask_byok" if byok else "ask_default"
+            budget[key] = budget.get(key, 0) + 1
+            self._commit(state)
+
+    def record_attempt(self, kind: str, *, byok: bool, limits: dict) -> None:
+        """Reserve one provider attempt durably before it can be sent."""
+        if kind not in ("llm", "query_embedding"):
+            raise ValueError("Unknown provider attempt")
+        with self._lock:
+            self._ensure_healthy()
+            state = copy.deepcopy(self.state)
+            budget = self._budget(state)
+            key = f"{kind}_{'byok' if byok else 'default'}"
+            total = budget.get(f"{kind}_default", 0) + budget.get(f"{kind}_byok", 0)
+            limit = limits["llm" if kind == "llm" else "query_embedding"]
+            if total >= limit or (
+                kind == "llm"
+                and not byok
+                and budget.get("llm_default", 0) >= limits["default_llm"]
+            ):
+                raise SessionError(
+                    "global_budget_exceeded", 503, self.seconds_until_reset()
+                )
+            budget[key] = budget.get(key, 0) + 1
+            self._commit(state)
+
+    def quota_snapshot(
+        self, identity: dict, *, byok: bool, personal_limit: int | None, limits: dict
+    ) -> dict:
+        with self._lock:
+            self._ensure_healthy()
+            daily = self.state["days"].get(self._day(), {})
+            used = daily.get("personal", {}).get(identity["quota_ref"], 0)
+            return {
+                "used_count": used,
+                "global_budget": {
+                    "status": (
+                        "exhausted"
+                        if self._exhausted(daily.get("budget", {}), byok, limits)
+                        else "available"
+                    ),
+                    "reset_at": self.reset_at(),
+                },
+            }
+
+    def budget_snapshot(self, limits: dict) -> dict:
+        with self._lock:
+            self._ensure_healthy()
+            budget = self.state["days"].get(self._day(), {}).get("budget", {})
+            return {
+                "date": self._day(),
+                "timezone": "UTC",
+                "reset_at": self.reset_at(),
+                "limits": dict(limits),
+                "counts": {key: budget.get(key, 0) for key in BUDGET_KEYS},
+                "usage": None,
+            }
+
+    def quota_stats(self, limit: int) -> dict:
+        with self._lock:
+            self._ensure_healthy()
+            personal = self.state["days"].get(self._day(), {}).get("personal", {})
+            quotas = [
+                {"quota_ref": key, "used_count": value, "daily_limit": limit}
+                for key, value in sorted(personal.items())
+            ]
+            return {
+                "date": self._day(),
+                "reset_at": self.reset_at(),
+                "default_daily_limit": limit,
+                "total_users": len(quotas),
+                "quotas": quotas,
+            }
+
+    def reset_personal(self, quota_ref: str) -> bool:
+        with self._lock:
+            self._ensure_healthy()
+            state = copy.deepcopy(self.state)
+            personal = self._daily(state)["personal"]
+            if quota_ref not in personal:
+                return False
+            personal[quota_ref] = 0
+            self._commit(state)
+            return True

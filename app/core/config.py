@@ -8,6 +8,7 @@ import os
 from typing import Any, Dict, Optional
 
 from fastapi import HTTPException
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.url_safety import is_safe_base_url
@@ -131,13 +132,64 @@ class Settings(BaseSettings):
 
     # 配额限制配置
     enable_quota_limit: bool = True  # 是否启用配额限制
+    enable_document_maintenance: bool = False
     default_daily_quota: int = 5  # 默认每日配额（未提供自定义API Key的用户）
+    global_daily_ask_limit: int = 500
+    global_daily_default_llm_limit: int = 200
+    global_daily_llm_limit: int = 500
+    global_daily_query_embedding_limit: int = 1000
+    quota_timezone: str = "UTC"
     quota_storage_path: str = "./data/quotas"  # 配额数据存储路径
     anonymous_store_reference: str = ""
     anonymous_storage_development: bool = False
     anonymous_mount_path: str = "/app/data"
     anonymous_mount_source: str = ""
     anonymous_cookie_secure: bool = True
+
+    @field_validator("llm_max_tokens", mode="before")
+    @classmethod
+    def validate_output_limit(cls, value):
+        """Environment configuration may lower, but never raise, the hard cap."""
+        if isinstance(value, str) and value.isascii() and value.isdecimal():
+            value = int(value)
+        if type(value) is not int or not 1 <= value <= 800:
+            raise ValueError("llm_max_tokens must be an integer from 1 to 800")
+        return value
+
+    @field_validator(
+        "default_daily_quota",
+        "global_daily_ask_limit",
+        "global_daily_default_llm_limit",
+        "global_daily_llm_limit",
+        "global_daily_query_embedding_limit",
+        mode="before",
+    )
+    @classmethod
+    def validate_daily_limit(cls, value):
+        """Accept positive integer settings, including environment strings."""
+        if isinstance(value, str) and value.isascii() and value.isdecimal():
+            value = int(value)
+        if type(value) is not int or value <= 0:
+            raise ValueError("Daily limits must be positive integers")
+        return value
+
+    def budget_limits(self) -> dict[str, int]:
+        """Return the configured UTC daily hard limits."""
+        self.validate_output_limit(self.llm_max_tokens)
+        limits = {
+            "ask": self.global_daily_ask_limit,
+            "default_llm": self.global_daily_default_llm_limit,
+            "llm": self.global_daily_llm_limit,
+            "query_embedding": self.global_daily_query_embedding_limit,
+        }
+        if self.quota_timezone != "UTC" or any(
+            type(value) is not int or value <= 0
+            for value in (*limits.values(), self.default_daily_quota)
+        ):
+            raise ValueError("Daily budget limits must be positive and timezone UTC")
+        if not self.anonymous_storage_development and not self.enable_quota_limit:
+            raise ValueError("Production requires personal quota enforcement")
+        return limits
 
     # jwt认证相关
     jwt_algorithm: str = "HS256"
