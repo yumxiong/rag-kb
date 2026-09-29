@@ -1,0 +1,264 @@
+{
+  "run_id": "step5-391ec58a94",
+  "started_at": "2026-09-28T13:39:29.624448+00:00",
+  "scope": "Docker Desktop Linux, not production acceptance",
+  "model_and_retrieval": "test doubles; no external model calls",
+  "checks": [
+    {
+      "name": "bootstrap",
+      "exit_code": 0,
+      "result": {
+        "source": "/dev/sdc",
+        "filesystem": "ext4"
+      }
+    },
+    {
+      "name": "linux-storage",
+      "exit_code": 0,
+      "tests_run": 12
+    },
+    {
+      "name": "nginx-config",
+      "exit_code": 0
+    },
+    {
+      "name": "https-proxy",
+      "exit_code": 0,
+      "result": {
+        "proxy": "passed",
+        "isolated_counts": [
+          2,
+          1,
+          1
+        ]
+      }
+    },
+    {
+      "name": "streamlit-http",
+      "exit_code": 0,
+      "result": {
+        "streamlit_real_http_sessions": "passed",
+        "counts": [
+          2,
+          1
+        ],
+        "rerun_preserves_identity": true
+      }
+    },
+    {
+      "name": "restart-persistence",
+      "exit_code": 0,
+      "result": {
+        "restart_identity_and_counts": "passed"
+      }
+    },
+    {
+      "name": "kill-persistence",
+      "exit_code": 0,
+      "result": {
+        "restart_identity_and_counts": "passed"
+      }
+    },
+    {
+      "name": "backend-before-recreate",
+      "exit_code": 0
+    },
+    {
+      "name": "recreate-persistence",
+      "exit_code": 0,
+      "result": {
+        "restart_identity_and_counts": "passed"
+      }
+    },
+    {
+      "name": "session-rate",
+      "exit_code": 0,
+      "result": {
+        "spoofed_xff_cannot_bypass_session_limit": "passed",
+        "route": "nginx"
+      }
+    },
+    {
+      "name": "direct-session-rate",
+      "exit_code": 0,
+      "result": {
+        "spoofed_xff_cannot_bypass_session_limit": "passed",
+        "route": "direct"
+      }
+    },
+    {
+      "name": "http-fault-temporary",
+      "exit_code": 0,
+      "result": {
+        "write_failure": "temporary",
+        "status": 503,
+        "engine_calls_after_failure": 0,
+        "latched_closed": true
+      }
+    },
+    {
+      "name": "recovery-temporary",
+      "exit_code": 0,
+      "result": {
+        "restart_identity_and_counts": "passed"
+      }
+    },
+    {
+      "name": "http-fault-file_fsync",
+      "exit_code": 0,
+      "result": {
+        "write_failure": "file_fsync",
+        "status": 503,
+        "engine_calls_after_failure": 0,
+        "latched_closed": true
+      }
+    },
+    {
+      "name": "recovery-file_fsync",
+      "exit_code": 0,
+      "result": {
+        "restart_identity_and_counts": "passed"
+      }
+    },
+    {
+      "name": "http-fault-replace",
+      "exit_code": 0,
+      "result": {
+        "write_failure": "replace",
+        "status": 503,
+        "engine_calls_after_failure": 0,
+        "latched_closed": true
+      }
+    },
+    {
+      "name": "recovery-replace",
+      "exit_code": 0,
+      "result": {
+        "restart_identity_and_counts": "passed"
+      }
+    },
+    {
+      "name": "http-fault-directory_fsync",
+      "exit_code": 0,
+      "result": {
+        "write_failure": "directory_fsync",
+        "status": 503,
+        "engine_calls_after_failure": 0,
+        "latched_closed": true
+      }
+    },
+    {
+      "name": "recovery-directory_fsync",
+      "exit_code": 0,
+      "result": {
+        "restart_identity_and_counts": "passed"
+      }
+    },
+    {
+      "name": "readonly-volume-startup",
+      "exit_code": 0,
+      "backend_exit_code": 3
+    },
+    {
+      "name": "missing-volume-startup",
+      "exit_code": 0,
+      "backend_exit_code": 3
+    }
+  ],
+  "existing_networks": [
+    {
+      "name": "bridge",
+      "subnet": "172.17.0.0/16"
+    },
+    {
+      "name": "docker_rag_network",
+      "subnet": "172.18.0.0/16"
+    }
+  ],
+  "test_network": {
+    "subnet": "172.30.0.0/24",
+    "nginx": "172.30.0.10",
+    "internal": true
+  },
+  "docker": "linux 6.6.114.1-microsoft-standard-WSL2",
+  "head": "da67133e1c80fa405c123e5a3d81d9ccbe2eab80",
+  "source_sha256": {
+    "app/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "app/api/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "app/api/anonymous_session.py": "13d2b3411ac5e54ac00b1fd25f46e59020c3327f78349b248d893c043e74fd92",
+    "app/api/auth.py": "cbbbab18e7d264c2c15e7370c4d2084b273c4d7430d0009681c8a5a68ddcb4fe",
+    "app/api/cost_optimization.py": "363b9380234976a0d49252e659c6d9a129b4efe7c581f6b120aa82ecb7e482d5",
+    "app/api/documents.py": "804618d608920818b897f46b1587ad00346f17af6b22efe3de86f59880bd93f4",
+    "app/api/qa.py": "d8fb92e1d26421aa84676a370fbbab3dfb08ae6a03890ff87f8257d0eac53d13",
+    "app/core/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "app/core/anonymous_session.py": "d10098f390068fd2be45104cfb7da1e8326e0d477990e9030c017f90a8be0a00",
+    "app/core/async_processor.py": "962c87dd74b9bb4239794fae8c2d89c0c3737e09a56678fe9208051c5169661c",
+    "app/core/cache_manager.py": "3723aaeb3378d59ac4601ed21048cfca8d99ae1bbaa19be580c674f58c7e671a",
+    "app/core/cached_embeddings.py": "6f7591100a0df3262f0349a8650e9a50ffbe384e1f8cb22e377a0c7bad139466",
+    "app/core/concurrency.py": "31a5a68dcd2efd8fedca201ab1f6933c4d20db1c63f51aaf13da5f65ace17229",
+    "app/core/config.py": "ab99ba37a063c4473a6e474c429a2410aee09a4087cb75e11585caaa7375f301",
+    "app/core/demo_content.py": "ed0919eb6394edcc915bb47876b1c8fa4c96b413a70f3293cda67a04def48a1f",
+    "app/core/document_processor.py": "3793f05f96c3fe74265ffd3d73069381f6bbb3563525f40d2a7fbfb6c8a84712",
+    "app/core/enhanced_pdf_processor.py": "30778107e8e7cfd4338ed6ab8686be977199dac5aa6f2b9c7bf7fb0fe3ce80fc",
+    "app/core/exceptions.py": "9bc99de65798b830eeb9923f1d031caf2510db8b3777990a1adce053a0552c8b",
+    "app/core/job_status.py": "52aa25ace1285e93e378e2524a5374ccf8cb235203875f52171a04bb9fb5ef19",
+    "app/core/llm_utils.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "app/core/qa_engine.py": "bac1200405294f0516914e2bab8cc5f94349e4457716d0a0224c45d0a880b061",
+    "app/core/quota_manager.py": "b4bd04de1815896dc3116aba5c2f8340ba7fb25eef05abfc77acb24bad636c50",
+    "app/core/rate_limiter.py": "cccfc0534d23eb530b815da7ded08f092919edabff67b950641d84b909964045",
+    "app/core/url_safety.py": "552903b6c24b04660197e40e1efd7eb4240171540dbab008945f1518f98934d2",
+    "app/core/vector_store.py": "6dccd007c8f58e5eba795275630cd2246eaf2df6b5344b031dc0c55f5b077de7",
+    "app/main.py": "e0c355155f3eeec08fd41e596a5e1a59cdb2ecc475fcdb8f7385bbfe21c41e5d",
+    "app/models/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "app/models/schemas.py": "8b8e89f5b7520143b3d79e62d64f0e95c893c3ce839f901b7a6c9afb40dab97b",
+    "docker/docker-compose.production.yml.template": "c03e2c734b57cc5119edf19995dbf414ff5ebf24e07ccad24f32c1379debafd5",
+    "docker/docker-compose.public-sim.yml": "bf64c4bef2c6014d1c7f049e7047e2bca85c69f21a403ee7e8644f574f3ff0eb",
+    "docker/docker-compose.yml": "765e8bb99bcba4bfce99d45f534a03af31bb0d7423662293a8f0c0867bb84628",
+    "docker/Dockerfile.backend": "2c63a41a0a40d23e2800c7969e449341cdccf63741aaccfc4cbf405ae1f0f0e9",
+    "docker/nginx/conf.d/public-sim.conf": "acf9be1ea58e591f40e5b0fdfaf5efbccd405d24d2008449c278314b0a4d4054",
+    "frontend/components/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "frontend/components/chat_interface.py": "62bec8c316db901831e429ebae6f89d880861cdf2c4f7755904e2e9e6066de29",
+    "frontend/components/document_list.py": "44706ac89cf482256cc020dc560f8cd648e6eb92c71955fe802af4143e0638ae",
+    "frontend/components/document_manager.py": "ad23bb699081ed273f6e2c9df439b73b9bc47469535820c2f66814a694dcff44",
+    "frontend/components/file_upload.py": "bbdb48cb53001a1307377c72a70b38a2c058e6866c5c4c5a5989150b318a7cc2",
+    "frontend/components/model_settings.py": "0f1abafae21bd63055e0fe3d738371b005c7931ac28dbb1f01662bce0249da82",
+    "frontend/pages/Admin.py": "6eb0b412934037773bde3c55ad179da73eae76f4776dabbcec002efc6785e04a",
+    "frontend/streamlit_app.py": "95c46d921abd9f83480fb374981997d9929653eca89194336d36736b2ed7eb10",
+    "frontend/utils/__init__.py": "7aba5f014a101e41635fc389f0faf3bbc58187cc71516453dd7c990c2ad71cb8",
+    "frontend/utils/anonymous_session.py": "b2bd8f24edc5da336aea13364f01e372be06d240e413471bfd6830770b82b9c7",
+    "frontend/utils/auto_refresh.py": "abc71530b983242fe8b1ccdce3920384c125e953e971349ddc814b200a6ec137",
+    "frontend/utils/final_refresh.py": "bb1e22bfdd0eec10c8b8c37969a7af1430737607243ccc49eb5e6b071330512a",
+    "frontend/utils/local_storage.py": "cd486c665a76add2f0be4b43640d788a9f7ff579d02c49a4732fd36faab9d279",
+    "frontend/utils/realtime_update.py": "68ce5dabebfbd48ae8b050ecbbada3bed8ebbe68d4db7f2f123aa1107ac17979",
+    "frontend/utils/settings_loader.py": "00510eda01cad4a92ef32b467a3bcfda54af095fb82371c3c96bacc2e2b69c6b",
+    "frontend/utils/simple_refresh.py": "58af1d3ec211e975eda6e24567af5de41eab37e8923934a5ab187f6d6734fbb3",
+    "frontend/utils/state_manager.py": "dd11764687ef03c30f6d4664ee5a1866b9927013a30ddd40f85456de1aec1b2f",
+    "frontend/utils/streamlit_refresh.py": "7c2db3a84928eff08a19264b0dcd69becb285ab61d708e14d3dd4628f6d352e8",
+    "scripts/acceptance/step5/backend_fixture.py": "d618738122088f4b0fda52894c327e46725b5162e4960827d03784381a74987b",
+    "scripts/acceptance/step5/client_checks.py": "062d88d4c6fbfc60de8c950f8bdfade120edeca745885137d417573517e3cc61",
+    "scripts/acceptance/step5/run.py": "85f64cbcac03c1563b21d2394213b3da436ec6134a165fd25317c57e449070fd",
+    "scripts/acceptance/step5/storage_checks.py": "a0ae8a9a0fb45ee03ffb1a501a0d4000a1d9e4aa7dde7231e3c4d76ad7f0ccad"
+  },
+  "images": {
+    "docker-backend:latest": "sha256:168bc2ec9e66a7f8f749996fcf882b1f7f4f1662c0dc27f1375948938b553387",
+    "docker-frontend:latest": "sha256:a731fb20eb4815e3ea2b671d7b9809826a0872ef9e52749d9f237bfaa90f28bc",
+    "nginx:alpine": "sha256:61e01287e546aac28a3f56839c136b31f590273f3b41187a36f46f6a03bbfe22"
+  },
+  "linux_data_mount": {
+    "source": "/dev/sdc",
+    "filesystem": "ext4"
+  },
+  "proxy_scope": {
+    "nginx_client_peer": "172.30.0.40",
+    "streamlit_direct_peer": "172.30.0.30",
+    "spoofed_xff_ignored": true,
+    "schemes": [
+      "https",
+      "http"
+    ]
+  },
+  "service_logs_contain_no_anonymous_credentials": true,
+  "passed": true,
+  "cleanup_complete": true,
+  "finished_at": "2026-09-28T13:41:20.900956+00:00"
+}

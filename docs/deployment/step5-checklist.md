@@ -177,7 +177,7 @@ frontend/streamlit_app.py
 [x] 后端只使用经过验证的身份计算配额键。
 [x] 支持浏览器 Cookie。
 [x] 支持 Streamlit 服务端转发身份。
-[ ] 明确反向代理下的 X-Forwarded-For 使用规则。（协议已规定；生产网关和 Uvicorn 配置待联验。）
+[x] 明确反向代理下的 X-Forwarded-For 使用规则。（Nginx 覆盖客户端值，Uvicorn 只信任 Nginx；2026-09-28 public-sim 配置的隔离 Linux 容器联验通过，生产主机 HTTPS 入口仍须另验。）
 [x] 不再直接使用容器内部看到的 Streamlit IP 作为个人身份。
 [x] 日志中不打印完整身份凭证。
 [x] 对身份凭证设置过期策略。
@@ -200,7 +200,18 @@ deploy 测试
 [x] 伪造身份凭证被拒绝或被视为新身份。
 [x] 过期身份按约定处理。
 [x] ask 和 quota 使用同一身份。
-[ ] 代理转发后不会把所有访客合并。（模拟同一来源身份隔离通过；真实代理联验待办。）
+[x] 代理转发后不会把所有访客合并。（2026-09-28 真实 Nginx→Uvicorn→FastAPI 下两个独立 Cookie 客户端分别累计 2/1；两个 Streamlit AppTest session 经真实内部 HTTP 分别累计 2/1，rerun 身份不变；检索/模型使用测试替身，不代表浏览器全流程或生产验收。）
+
+第 2 步 Linux 隔离验收补录（2026-09-28）
+[x] 修正 public-sim 固定地址归属：172.30.0.10 属于 nginx，frontend 不占用该可信地址。
+[x] 检查现有 Docker 网络与 172.30.0.0/24 无重叠；运行前自动重查，冲突即停止。
+[x] 独立 Linux named volumes（ext4）显式 bootstrap；非 Windows bind mount，development=false。
+[x] 缺卷、错挂载源、缺 reference、账本/标记同时丢失、部分建账、UUID 错配、损坏/非法计数、只读卷和第二进程拒绝启动。
+[x] 普通重启、SIGKILL 后启动、删除并重建后端容器后，原身份、期限、创建日计数和个人计数保留。
+[x] 临时文件创建、文件 fsync、replace、目录 fsync 故障注入后受控 503，锁存拒绝，测试引擎调用增量为 0；恢复后已确认计数不降。
+[ ] 目标生产 Linux 主机、实际部署卷/reference、正式域名 HTTPS、宿主机/虚拟机重启与断电持久性验收。
+[ ] 完整浏览器→Streamlit WebSocket→内部 API 交互及真实模型回归；本轮 AppTest 与 HTTPS 根页面检查不替代它。
+证据与边界见 [2026-09-28 第 2 步联验记录](step5-proxy-linux-acceptance-2026-09-28.md)。第 3 步全站预算与完整准入/扣额规则尚未开始。
 第 3 步：deploy 实现个人配额和全站预算
 3.1 重构个人配额
 当前 QuotaManager 使用 IP + User-Agent，需要改为使用第 2 步定义的匿名身份键。
@@ -538,4 +549,4 @@ deploy 先确定“身份、配额、预算和错误如何工作”；integratio
 
 当前：双方已确认 `anonymous-quota-v1-draft.2` 正文提交 `0f6ecf2ff2cec29158ea81616d6dbed4480dd67c`，契约已冻结，第 1 步完成；deploy 进入第 2 步匿名身份实现。文档确认不代表功能、故障注入或两套前端联调通过。
 
-第 2 步本地验证：后端全量 `pytest --no-cov -q` 为 439 passed、1 skipped；Streamlit 交互测试另用装有 Streamlit 的解释器运行，5 passed。第 2 步仍需真实代理来源/转发联验、Linux 持久卷及故障注入后才能关闭；第 3 步全站预算与问答准入原子性尚未开始。见 [本地建账与运行说明](step5-anonymous-store-operations.md)。
+第 2 步上一轮本地检查点（历史记录，非本轮重跑）：后端全量 `pytest --no-cov -q` 为 439 passed、1 skipped，Streamlit 5 passed，匿名会话 10 passed；Compose YAML、diff 检查及 backend 镜像构建通过。随后发现 public-sim 错将可信地址分配给 frontend，本轮已修正为 nginx。2026-09-28 本轮完成隔离 Docker Linux 的真实代理、Streamlit 内部 HTTP、ext4 named volume 重启/重建与四个写入边界故障检查；匿名会话回归在后端镜像中 10 passed，Windows Streamlit 回归 5 passed。完整证据、可复跑脚本及未验收范围见 [联验记录](step5-proxy-linux-acceptance-2026-09-28.md)与[运行说明](step5-anonymous-store-operations.md)。未将 Windows 源码 bind mount 当作账本卷验收，未创建生产环境配置；生产目标主机、全浏览器链路和公网验收仍待办。第 3 步全站预算与完整准入原子性尚未开始，不能据此公网部署。

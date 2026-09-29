@@ -9,12 +9,24 @@ services:
     networks:
       - rag_network
     volumes:
-      
+      # The quota ledger must live on the independently managed persistent volume.
+      - ../data:/app/data
+      # The store reference is deliberately outside the quota volume.
+      - ../config/anonymous-store-reference.json:/app/config/anonymous-store-reference.json:ro
       # Production secrets (if using Docker secrets)
       - ../secrets:/run/secrets:ro
     
     env_file:
       - ../.env.production
+    environment:
+      QUOTA_STORAGE_PATH: /app/data/quotas
+      ANONYMOUS_STORE_REFERENCE: /app/config/anonymous-store-reference.json
+      ANONYMOUS_MOUNT_PATH: /app/data
+      # Set this to the bind/volume source shown by /proc/self/mountinfo.
+      ANONYMOUS_MOUNT_SOURCE: ${ANONYMOUS_MOUNT_SOURCE:?set persistent mount source}
+      ANONYMOUS_STORAGE_DEVELOPMENT: "false"
+      ANONYMOUS_COOKIE_SECURE: "true"
+      TRUSTED_PROXY_IPS: 172.30.0.10
     
 
   frontend:
@@ -48,8 +60,10 @@ services:
       - backend
       - frontend
     restart: unless-stopped
+    # Keep the trusted proxy address stable across restarts.
     networks:
-      - rag_network
+      rag_network:
+        ipv4_address: 172.30.0.10
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
       interval: 30s
@@ -75,6 +89,9 @@ services:
 networks:
   rag_network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
 
 volumes:
   app_data:

@@ -14,6 +14,8 @@ services:
       - ../data:/app/data
       - ../logs:/app/logs
     environment:
+      # Uvicorn trusts forwarded headers only from the Nginx address.
+      - TRUSTED_PROXY_IPS=${TRUSTED_PROXY_IPS:-172.30.0.10}
       # 存储配置
       - CHROMA_DB_PATH=/app/data/chroma_db
       - UPLOAD_DIR=/app/data/uploads
@@ -55,3 +57,6 @@ services:
 
 networks:
   rag_network:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
