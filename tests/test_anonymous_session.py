@@ -6,12 +6,11 @@ import time
 from unittest.mock import MagicMock, patch
 
 import pytest
-from fastapi.testclient import TestClient
-
 from app.core.anonymous_session import AnonymousSessionStore, SessionError, bootstrap
 from app.core.config import settings
 from app.main import app
 from app.models.schemas import QuestionResponse
+from fastapi.testclient import TestClient
 from frontend.utils.anonymous_session import ensure_identity, recover_identity
 
 
@@ -199,6 +198,53 @@ def test_real_ask_and_quota_share_identity_behind_proxy(client, monkeypatch):
             assert result.json()["used_count"] == count
         denied = test_client.post("/api/qa/ask", json={"question": "测试问题"})
         assert denied.status_code == 401
+        assert engine.ask.call_count == 3
+
+
+def test_independent_cookie_clients_keep_separate_quota(client, monkeypatch):
+    first_client, _, _ = client
+    second_client = TestClient(app, base_url="https://testserver")
+    monkeypatch.setattr(settings, "enable_quota_limit", True)
+    monkeypatch.setattr(settings, "default_daily_quota", 2)
+    origin = {"Origin": settings.get_cors_origins()[0]}
+    vector = MagicMock()
+    vector.get_collection_info.return_value = {"document_count": 1}
+    engine = MagicMock()
+    engine.ask.return_value = QuestionResponse(
+        answer="test", sources=[], processing_time=0
+    )
+
+    with patch("app.api.qa.vector_store", vector), patch(
+        "app.api.qa.qa_engine", engine
+    ):
+        for visitor in (first_client, second_client):
+            created = visitor.post(
+                "/api/session/anonymous", json={"transport": "cookie"}, headers=origin
+            )
+            assert created.status_code == 201
+            assert "token" not in created.json()
+            assert visitor.get("/api/qa/quota").json()["used_count"] == 0
+
+        assert first_client.cookies.get("rag_anonymous") != second_client.cookies.get(
+            "rag_anonymous"
+        )
+        for visitor, expected in (
+            (first_client, 1),
+            (first_client, 2),
+            (second_client, 1),
+        ):
+            response = visitor.post(
+                "/api/qa/ask", json={"question": "测试问题"}, headers=origin
+            )
+            assert response.status_code == 200
+            assert visitor.get("/api/qa/quota").json()["used_count"] == expected
+
+        denied = first_client.post(
+            "/api/qa/ask", json={"question": "测试问题"}, headers=origin
+        )
+        assert denied.status_code == 429
+        assert denied.json()["detail"]["code"] == "quota_exceeded"
+        assert second_client.get("/api/qa/quota").json()["remaining"] == 1
         assert engine.ask.call_count == 3
 
 

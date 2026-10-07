@@ -6,7 +6,6 @@ import json
 import logging
 import os
 import subprocess
-import uuid
 from datetime import datetime
 
 import requests
@@ -248,27 +247,6 @@ BACKEND_URL_CLIENT = os.getenv(
 
 # 文档管理接口已改为管理员鉴权，禁用浏览器侧匿名轮询。
 # 如需恢复前端实时更新，请在后续改造中为浏览器请求加入安全鉴权机制。
-
-
-def init_websocket_connection(client_id: str):
-    """使用JS注入WebSocket连接"""
-    ws_url = f"{BACKEND_URL_CLIENT.replace('http', 'ws')}/ws/{client_id}"
-
-    js_code = f"""
-    <script>
-    (function() {{
-        if (!window.ragWs) {{
-            console.log('Attempting to connect WebSocket to {ws_url}');
-            const ws = new WebSocket('{ws_url}');
-            ws.onopen = () => console.log('WebSocket connection established.');
-            ws.onclose = () => console.log('WebSocket connection closed.');
-            ws.onerror = (error) => console.error('WebSocket error:', error);
-            window.ragWs = ws;
-        }}
-    }})();
-    </script>
-    """
-    components.html(js_code, height=0, width=0)
 
 
 def build_byok_headers() -> dict:
@@ -774,12 +752,6 @@ def main():
 
     # 添加右上角浮动管理员按钮
     # add_floating_admin_button()
-
-    # --- WebSocket & Client ID Management ---
-    if "client_id" not in st.session_state:
-        st.session_state.client_id = str(uuid.uuid4())
-        with st.container():
-            init_websocket_connection(st.session_state.client_id)
 
     # 加载用户设置
     load_user_settings()
