@@ -2,6 +2,7 @@
 问答API
 """
 
+import asyncio
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -14,6 +15,7 @@ from app.api.anonymous_session import require_identity, store
 from app.api.auth import require_admin
 from app.core.anonymous_session import SessionError
 from app.core.config import settings
+from app.core.deadline import QuestionDeadline, deadline_scope
 from app.core.demo_content import DEMO_QUESTIONS
 from app.core.qa_engine import QAEngine
 from app.core.url_safety import is_safe_base_url
@@ -35,6 +37,16 @@ class QuotaResetRequest(BaseModel):
 # 全局实例（延迟初始化）
 vector_store = None
 qa_engine = None
+
+
+def _release_question_leases(leases):
+    for lease in leases:
+        lease.release()
+
+
+def _is_timeout_error(error: BaseException) -> bool:
+    """Recognize provider timeout classes without exposing provider details."""
+    return isinstance(error, TimeoutError) or "timeout" in type(error).__name__.lower()
 
 
 def get_vector_store():
@@ -119,6 +131,11 @@ async def ask_question(
 
         overrides = _extract_overrides_from_headers(request)
         has_custom_key = bool(overrides.get("api_key"))
+        request.app.state.session_rate_limit.check_identity(
+            identity["quota_ref"],
+            "ask",
+            settings.max_ask_requests_per_minute,
+        )
 
         # 检查是否有文档数据
         collection_info = get_vector_store().get_collection_info()
@@ -137,16 +154,25 @@ async def ask_question(
                 raise SessionError("service_unavailable", 503)
             engine = get_qa_engine()
 
-        # 执行问答（信号量保护，防止 LLM 并发过载）
-        import asyncio
+        from app.core.concurrency import (
+            get_identity_gate,
+            get_llm_gate,
+            get_qa_executor,
+        )
+        from app.core.global_budget import question_budget
 
-        from app.core.concurrency import get_llm_semaphore
-
-        semaphore = get_llm_semaphore()
-        if semaphore._value == 0:
-            logger.warning("LLM semaphore exhausted, rejecting ask request")
+        identity_lease = get_identity_gate().try_acquire(identity["quota_ref"])
+        llm_lease = get_llm_gate().try_acquire()
+        if identity_lease is None or llm_lease is None:
+            if identity_lease is not None:
+                identity_lease.release()
+            if llm_lease is not None:
+                llm_lease.release()
+            logger.warning("Question concurrency exhausted, rejecting ask request")
             raise SessionError("service_busy", 503, 1)
-        async with semaphore:
+
+        submitted = False
+        try:
             store(request).admit(
                 identity,
                 byok=has_custom_key,
@@ -157,10 +183,15 @@ async def ask_question(
                 ),
                 limits=limits,
             )
-            from app.core.global_budget import question_budget
+            deadline = QuestionDeadline(
+                overall_seconds=settings.question_deadline_seconds,
+                embedding_seconds=settings.embedding_timeout_seconds,
+                chat_seconds=settings.chat_timeout_seconds,
+            )
+            deadline.check()
 
             def run_question():
-                with question_budget(
+                with deadline_scope(deadline), question_budget(
                     store(request), byok=has_custom_key, limits=limits
                 ):
                     return engine.ask(
@@ -169,15 +200,33 @@ async def ask_question(
                         document_id=payload.document_id,
                     )
 
+            worker_future = get_qa_executor().submit(run_question)
+            submitted = True
+            worker_future.add_done_callback(
+                lambda _: _release_question_leases((identity_lease, llm_lease))
+            )
+            worker = asyncio.wrap_future(worker_future)
             try:
-                answer_response = await asyncio.get_running_loop().run_in_executor(
-                    None, run_question
+                answer_response = await asyncio.wait_for(
+                    asyncio.shield(worker), timeout=deadline.remaining()
                 )
+            except asyncio.TimeoutError:
+                deadline.cancel()
+                raise SessionError("upstream_timeout", 504) from None
+            except asyncio.CancelledError:
+                deadline.cancel()
+                # The concurrent future still owns both leases until the thread exits.
+                raise
             except SessionError:
                 raise
-            except Exception:
+            except Exception as error:
+                if _is_timeout_error(error):
+                    raise SessionError("upstream_timeout", 504) from None
                 logger.error("Question provider failed")
                 raise SessionError("upstream_error", 502) from None
+        finally:
+            if not submitted:
+                _release_question_leases((identity_lease, llm_lease))
 
         request_id = str(uuid.uuid4())
         answer_response = answer_response.model_copy(update={"request_id": request_id})
@@ -408,6 +457,12 @@ async def get_quota_info(
     """获取当前用户配额信息"""
     try:
         from app.core.config import settings
+
+        request.app.state.session_rate_limit.check_identity(
+            identity["quota_ref"],
+            "quota",
+            settings.max_quota_requests_per_minute,
+        )
 
         # 检查是否使用了自定义API Key
         overrides = _extract_overrides_from_headers(request)

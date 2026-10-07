@@ -149,9 +149,13 @@ def test_anonymous_demo_question_and_citations(monkeypatch):
         sources=sources,
         processing_time=0.1,
     )
-    with patch("app.api.qa.get_vector_store", return_value=store), patch(
+    with patch.object(
+        type(settings), "get_api_key", return_value="demo-test-only-key"
+    ), patch("app.api.qa.get_vector_store", return_value=store), patch(
         "app.api.qa.get_qa_engine", return_value=engine
-    ), patch("app.api.documents.get_vector_store", return_value=store):
+    ), patch(
+        "app.api.documents.get_vector_store", return_value=store
+    ):
         suggestions = client.get("/api/qa/suggestions")
         assert suggestions.json()["suggestions"] == list(DEMO_QUESTIONS)
         library = client.get("/api/documents/library")

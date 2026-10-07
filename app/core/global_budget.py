@@ -7,6 +7,7 @@ from langchain_core.callbacks import BaseCallbackHandler
 
 from app.core.anonymous_session import SessionError
 from app.core.config import settings
+from app.core.deadline import current_deadline
 from app.core.question_cost import MAX_MESSAGES_BYTES, serialized_messages_size
 
 _budget_context = ContextVar("budget_context", default=None)
@@ -82,6 +83,9 @@ class ChatAttemptCallback(BaseCallbackHandler):
 
     def on_chat_model_start(self, serialized, messages, **kwargs):
         require_query_context()
+        deadline = current_deadline()
+        if deadline is not None:
+            deadline.check()
         if (
             len(messages) != 1
             or serialized_messages_size(messages[0]) > MAX_MESSAGES_BYTES

@@ -129,6 +129,15 @@ class Settings(BaseSettings):
     # 并发保护配置
     max_concurrent_llm_requests: int = 5  # LLM 调用最大并发数
     max_concurrent_requests: int = 20  # 全局最大并发请求数
+    max_concurrent_identity_questions: int = 1
+    question_deadline_seconds: int = 60
+    embedding_timeout_seconds: int = 15
+    chat_timeout_seconds: int = 45
+
+    # Application rolling-window limits; the reverse proxy has independent limits.
+    max_session_requests_per_minute: int = 30
+    max_ask_requests_per_minute: int = 6
+    max_quota_requests_per_minute: int = 60
 
     # 配额限制配置
     enable_quota_limit: bool = True  # 是否启用配额限制
@@ -154,6 +163,42 @@ class Settings(BaseSettings):
             value = int(value)
         if type(value) is not int or not 1 <= value <= 800:
             raise ValueError("llm_max_tokens must be an integer from 1 to 800")
+        return value
+
+    @field_validator(
+        "max_concurrent_llm_requests",
+        "max_concurrent_requests",
+        "max_concurrent_identity_questions",
+        "max_session_requests_per_minute",
+        "max_ask_requests_per_minute",
+        "max_quota_requests_per_minute",
+        mode="before",
+    )
+    @classmethod
+    def validate_traffic_limit(cls, value):
+        if isinstance(value, str) and value.isascii() and value.isdecimal():
+            value = int(value)
+        if type(value) is not int or value <= 0:
+            raise ValueError("Traffic limits must be positive integers")
+        return value
+
+    @field_validator(
+        "question_deadline_seconds",
+        "embedding_timeout_seconds",
+        "chat_timeout_seconds",
+        mode="before",
+    )
+    @classmethod
+    def validate_provider_deadline(cls, value, info):
+        if isinstance(value, str) and value.isascii() and value.isdecimal():
+            value = int(value)
+        maximum = {
+            "question_deadline_seconds": 60,
+            "embedding_timeout_seconds": 15,
+            "chat_timeout_seconds": 45,
+        }[info.field_name]
+        if type(value) is not int or not 1 <= value <= maximum:
+            raise ValueError(f"{info.field_name} must be from 1 to {maximum} seconds")
         return value
 
     @field_validator(

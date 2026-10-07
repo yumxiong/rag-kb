@@ -81,6 +81,11 @@ class VectorStore:
                 # One query must map to one provider request, without auto-splitting.
                 "check_embedding_ctx_length": False,
             }
+            embedding_timeout = getattr(settings, "embedding_timeout_seconds", None)
+            if isinstance(embedding_timeout, (int, float)) and not isinstance(
+                embedding_timeout, bool
+            ):
+                embedding_kwargs["timeout"] = embedding_timeout
             if embedding_api_url and embedding_api_url != "https://api.openai.com/v1":
                 embedding_kwargs["base_url"] = embedding_api_url
                 embedding_kwargs["organization"] = ""

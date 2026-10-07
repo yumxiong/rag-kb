@@ -819,3 +819,239 @@ def test_all_literal_session_error_codes_have_public_messages():
                 and isinstance(node.args[0], ast.Constant)
             ):
                 assert node.args[0].value in codes, path
+
+
+def test_identity_rate_windows_reject_without_budget_admission(contract, monkeypatch):
+    monkeypatch.setattr(settings, "max_ask_requests_per_minute", 2)
+    monkeypatch.setattr(settings, "max_quota_requests_per_minute", 2)
+    assert ask(contract, question="rate one").status_code == 200
+    assert ask(contract, question="rate two").status_code == 200
+    denied = ask(contract, question="rate three")
+    assert_error(denied, 429, "rate_limited")
+    assert denied.headers["Retry-After"] == str(
+        denied.json()["detail"]["retry_after_seconds"]
+    )
+    assert counts(contract)["ask_default"] == 2
+    for _ in range(2):
+        assert (
+            contract.client.get("/api/qa/quota", headers=contract.headers).status_code
+            == 200
+        )
+    quota = contract.client.get("/api/qa/quota", headers=contract.headers)
+    assert_error(quota, 429, "rate_limited")
+
+
+def test_session_ip_window_limits_reuse_without_creating_identity(
+    contract, monkeypatch
+):
+    monkeypatch.setattr(settings, "max_session_requests_per_minute", 2)
+    reused = contract.client.post(
+        "/api/session/anonymous",
+        json={"transport": "header"},
+        headers=contract.headers,
+    )
+    assert reused.status_code == 200
+    limited = contract.client.post(
+        "/api/session/anonymous",
+        json={"transport": "header"},
+        headers=contract.headers,
+    )
+    assert_error(limited, 429, "rate_limited")
+    assert contract.ledger.resolve(contract.headers["X-Anonymous-Token"])
+    assert not any(counts(contract).values())
+
+
+def test_global_question_gate_applies_across_identities(contract, monkeypatch):
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    started = threading.Event()
+    release = threading.Event()
+    response = contract.provider.create.return_value
+
+    def blocked_provider(**kwargs):
+        started.set()
+        assert release.wait(5)
+        return response
+
+    monkeypatch.setattr(settings, "max_concurrent_llm_requests", 1)
+    contract.provider.create.side_effect = blocked_provider
+    other = contract.client.post("/api/session/anonymous", json={"transport": "header"})
+    assert other.status_code == 201
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        pending = executor.submit(ask, contract, question="global slot owner")
+        try:
+            assert started.wait(5)
+            denied = contract.client.post(
+                "/api/qa/ask",
+                json={"question": "different identity"},
+                headers={"X-Anonymous-Token": other.json()["token"]},
+            )
+            assert_error(denied, 503, "service_busy")
+            assert counts(contract)["ask_default"] == 1
+        finally:
+            release.set()
+        assert pending.result(timeout=5).status_code == 200
+
+
+def test_timed_out_question_keeps_worker_slots_until_thread_exits(
+    contract, monkeypatch
+):
+    import threading
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    started = threading.Event()
+    release = threading.Event()
+    response = contract.provider.create.return_value
+
+    def blocked_provider(**kwargs):
+        started.set()
+        assert release.wait(5)
+        return response
+
+    contract.provider.create.side_effect = blocked_provider
+    monkeypatch.setattr(settings, "question_deadline_seconds", 0.2)
+    monkeypatch.setattr(settings, "max_ask_requests_per_minute", 20)
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        pending = executor.submit(ask, contract, question="held question")
+        try:
+            assert started.wait(5)
+            denied = ask(contract, question="concurrent question")
+            assert_error(denied, 503, "service_busy")
+            timed_out = pending.result(timeout=5)
+            assert_error(timed_out, 504, "upstream_timeout")
+            denied_again = ask(contract, question="still held question")
+            assert_error(denied_again, 503, "service_busy")
+            assert counts(contract)["ask_default"] == 1
+        finally:
+            release.set()
+    for _ in range(100):
+        if concurrency.get_llm_gate().active == 0:
+            break
+        time.sleep(0.01)
+    assert concurrency.get_llm_gate().active == 0
+    assert contract.ledger.personal_count(contract.identity) == 1
+    assert ask(contract, question="after worker exits").status_code == 200
+
+
+def test_sdk_provider_timeouts_use_remaining_question_deadline(contract, monkeypatch):
+    import httpx
+
+    requests = []
+
+    def respond(request):
+        requests.append(request)
+        if request.url.path.endswith("/embeddings"):
+            return httpx.Response(
+                200,
+                json={
+                    "object": "list",
+                    "model": "test-embedding",
+                    "data": [{"object": "embedding", "index": 0, "embedding": [1, 0]}],
+                    "usage": {"prompt_tokens": 1, "total_tokens": 1},
+                },
+            )
+        return httpx.Response(
+            200,
+            json={
+                "id": "chatcmpl-test",
+                "object": "chat.completion",
+                "created": 0,
+                "model": "test-model",
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {"role": "assistant", "content": "Test answer"},
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {
+                    "prompt_tokens": 5,
+                    "completion_tokens": 2,
+                    "total_tokens": 7,
+                },
+            },
+        )
+
+    transport = httpx.MockTransport(respond)
+    embedding_client = httpx.Client(transport=transport)
+    chat_client = httpx.Client(transport=transport, follow_redirects=False)
+    monkeypatch.setattr(settings, "question_deadline_seconds", 1)
+    contract.embeddings.base_embeddings = OpenAIEmbeddings(
+        api_key="test-only",
+        model="test-embedding",
+        max_retries=0,
+        check_embedding_ctx_length=False,
+        http_client=embedding_client,
+    )
+    engine = qa_engine.QAEngine(contract.vector)
+    engine.llm = ChatOpenAI(
+        api_key="test-only",
+        model="test-model",
+        max_retries=0,
+        http_client=chat_client,
+    )
+    monkeypatch.setattr(qa, "qa_engine", engine)
+    try:
+        assert ask(contract, question="SDK deadline question").status_code == 200
+        assert len(requests) >= 2
+        for request in requests:
+            assert 0 < request.extensions["timeout"]["read"] <= 1
+    finally:
+        embedding_client.close()
+        chat_client.close()
+
+
+def test_cancelled_http_ask_holds_worker_slots(contract, monkeypatch):
+    import asyncio
+    import threading
+    import time
+
+    import httpx
+
+    started = threading.Event()
+    release = threading.Event()
+    response = contract.provider.create.return_value
+
+    def blocked_provider(**kwargs):
+        started.set()
+        assert release.wait(5)
+        return response
+
+    contract.provider.create.side_effect = blocked_provider
+    monkeypatch.setattr(settings, "max_ask_requests_per_minute", 20)
+
+    async def cancel_request():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(
+            transport=transport, base_url="https://testserver"
+        ) as client:
+            pending = asyncio.create_task(
+                client.post(
+                    "/api/qa/ask",
+                    json={"question": "cancelled question"},
+                    headers=contract.headers,
+                )
+            )
+            assert await asyncio.to_thread(started.wait, 5)
+            pending.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await pending
+            denied = await client.post(
+                "/api/qa/ask",
+                json={"question": "while cancelled worker runs"},
+                headers=contract.headers,
+            )
+            assert_error(denied, 503, "service_busy")
+
+    try:
+        asyncio.run(cancel_request())
+        assert counts(contract)["ask_default"] == 1
+    finally:
+        release.set()
+    for _ in range(100):
+        if concurrency.get_llm_gate().active == 0:
+            break
+        time.sleep(0.01)
+    assert concurrency.get_llm_gate().active == 0

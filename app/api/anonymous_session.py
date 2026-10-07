@@ -57,31 +57,43 @@ def require_identity(request: Request) -> dict:
 
 
 class SessionRateLimit:
-    """Bound all session requests, including failed credential verification."""
+    """Bound IP and identity request windows without using them as quota keys."""
 
     def __init__(self):
         self.windows = defaultdict(deque)
         self.lock = Lock()
 
-    def check(self, source: str):
+    def check(self, source: str, *, limit: int | None = None, bucket: str = "ip"):
+        if limit is None:
+            limit = settings.max_session_requests_per_minute
+        if type(limit) is not int or limit <= 0:
+            raise ValueError("Session rate limit must be a positive integer")
         now = time.monotonic()
+        key = (bucket, source)
         with self.lock:
-            for key in list(self.windows):
-                if not self.windows[key] or self.windows[key][-1] <= now - 60:
-                    del self.windows[key]
-            window = self.windows[source]
+            for stale_key in list(self.windows):
+                if (
+                    not self.windows[stale_key]
+                    or self.windows[stale_key][-1] <= now - 60
+                ):
+                    del self.windows[stale_key]
+            window = self.windows[key]
             while window and window[0] <= now - 60:
                 window.popleft()
-            if len(window) >= 30:
+            if len(window) >= limit:
                 raise SessionError(
                     "rate_limited", 429, max(1, math.ceil(window[0] + 60 - now))
                 )
             window.append(now)
 
+    def check_identity(self, quota_ref: str, endpoint: str, limit: int) -> None:
+        self.check(quota_ref, limit=limit, bucket=f"identity:{endpoint}")
+
 
 async def session_error_handler(request: Request, error: SessionError):
     request_id = str(uuid.uuid4())
     messages = {
+        "upstream_timeout": "Upstream request timed out; try again later.",
         "anonymous_session_required": "请先连接匿名会话。",
         "anonymous_session_expired": "会话已过期，请重新连接。",
         "anonymous_session_invalid": "会话失效，请重新连接。",
@@ -130,7 +142,9 @@ async def session_error_handler(request: Request, error: SessionError):
 async def initialize(request: Request):
     """Create a durable anonymous identity or reuse its fixed lifetime."""
     source = request.client.host if request.client else "unknown"
-    request.app.state.session_rate_limit.check(source)
+    request.app.state.session_rate_limit.check(
+        source, limit=settings.max_session_requests_per_minute
+    )
     if (
         request.headers.get("content-type", "").split(";", 1)[0].lower()
         != "application/json"

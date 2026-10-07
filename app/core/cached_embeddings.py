@@ -6,8 +6,10 @@ import logging
 from typing import List
 
 from langchain_core.embeddings import Embeddings
+from langchain_openai import OpenAIEmbeddings
 
 from app.core.cache_manager import cache_manager
+from app.core.deadline import current_deadline
 from app.core.global_budget import (
     record_provider_attempt,
     require_document_provider_access,
@@ -65,6 +67,9 @@ class CachedEmbeddings(Embeddings):
     def embed_query(self, text: str) -> List[float]:
         """嵌入单个查询"""
         require_query_context()
+        deadline = current_deadline()
+        if deadline is not None:
+            deadline.check()
         # 检查缓存
         cached_embedding = cache_manager.get_embedding_cache(text, self.model_name)
         if cached_embedding is not None:
@@ -75,7 +80,17 @@ class CachedEmbeddings(Embeddings):
         # 生成新的嵌入
         logger.debug("Generating new embedding for query")
         record_provider_attempt("query_embedding")
-        embedding = self.base_embeddings.embed_query(text)
+        provider = self.base_embeddings
+        if deadline is not None:
+            timeout = deadline.provider_timeout("embedding")
+            if isinstance(provider, OpenAIEmbeddings):
+                root_client = provider.client._client
+                client = root_client.with_options(timeout=timeout)
+                provider = provider.model_copy(update={"client": client.embeddings})
+        started_at = deadline.clock() if deadline is not None else None
+        embedding = provider.embed_query(text)
+        if deadline is not None:
+            deadline.check_provider_elapsed(started_at, "embedding")
         self.api_calls += 1
 
         # 缓存结果

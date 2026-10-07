@@ -57,6 +57,9 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
+        from app.core.concurrency import shutdown_qa_executor
+
+        shutdown_qa_executor(wait=True)
         app.state.anonymous_store.close()
 
     # 关闭时清理

@@ -15,6 +15,7 @@ from langchain_openai import ChatOpenAI
 from app.core.anonymous_session import SessionError
 from app.core.cache_manager import cache_manager
 from app.core.config import settings
+from app.core.deadline import current_deadline
 from app.core.global_budget import (
     ChatAttemptCallback,
     in_question_budget,
@@ -111,6 +112,11 @@ class QAEngine:
                 "http_client": httpx.Client(follow_redirects=False),
                 "http_async_client": httpx.AsyncClient(follow_redirects=False),
             }
+            chat_timeout = getattr(settings, "chat_timeout_seconds", None)
+            if isinstance(chat_timeout, (int, float)) and not isinstance(
+                chat_timeout, bool
+            ):
+                llm_kwargs["timeout"] = chat_timeout
             if model_config["provider"] == "deepseek":
                 llm_kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
 
@@ -167,6 +173,9 @@ class QAEngine:
     ) -> QuestionResponse:
         """回答问题（带缓存优化）"""
         require_query_context()
+        deadline = current_deadline()
+        if deadline is not None:
+            deadline.check()
         start_time = time.time()
 
         try:
@@ -331,6 +340,8 @@ class QAEngine:
                 else None
             )
             if cached_result:
+                if deadline is not None:
+                    deadline.check()
                 processing_time = time.time() - start_time
                 logger.info(f"Question answered from cache in {processing_time:.2f}s")
                 cached_sources = [
@@ -346,8 +357,23 @@ class QAEngine:
 
             # 缓存未命中，执行RAG查询（为本次请求构建 retriever，防止跨文档混入）
             qa_chain = self._build_qa_chain(retriever=retriever)
+            if deadline is not None:
+                root_client = getattr(self.llm, "root_client", None)
+                if root_client is not None:
+                    timeout = deadline.provider_timeout("chat")
+                    client = root_client.with_options(timeout=timeout)
+                    llm = self.llm.model_copy(
+                        update={
+                            "root_client": client,
+                            "client": client.chat.completions,
+                        }
+                    )
+                    qa_chain.combine_documents_chain.llm_chain.llm = llm
             config = {"callbacks": [ChatAttemptCallback()]}
+            chat_started_at = deadline.clock() if deadline is not None else None
             result = qa_chain.invoke({"query": question}, config=config)
+            if deadline is not None:
+                deadline.check_provider_elapsed(chat_started_at, "chat")
 
             # 处理答案
             answer = result.get("result", "抱歉，我无法找到相关信息来回答这个问题。")
@@ -376,6 +402,8 @@ class QAEngine:
 
             # 缓存结果
             sources_dict = [src.model_dump() for src in sources]
+            if deadline is not None:
+                deadline.check()
             if settings.enable_qa_cache:
                 cache_manager.set_qa_cache(
                     question, context_hash, answer, sources_dict, model_name
