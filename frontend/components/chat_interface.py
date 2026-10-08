@@ -57,14 +57,31 @@ class ChatInterface:
             self._render_chat_history()
             top_c1, top_c2 = st.columns([5, 1])
             with top_c2:
-                if st.button("🗑️ 清空对话", key="clear_chat", use_container_width=True):
+                if st.button(
+                    "🗑️ 清空对话",
+                    key="clear_chat",
+                    use_container_width=True,
+                    disabled=st.session_state.is_processing,
+                ):
                     st.session_state.messages = []
+                    st.session_state.pop("retry_question", None)
                     if st.session_state.get("reset_scope_on_clear", True):
                         st.session_state.selected_doc_id = None
                     st.rerun()
 
         # 输入区域 + 高级设置
         self._render_input_area()
+        if st.session_state.get("retry_question"):
+            st.caption("请求失败不代表未计次；主动重试会发起一次新的问答。")
+            if st.button(
+                "明确重试上个问题",
+                key="retry_failed_question",
+                disabled=st.session_state.is_processing,
+            ):
+                self._process_question(st.session_state.retry_question)
+        pending_question = st.session_state.pop("pending_question", None)
+        if pending_question is not None:
+            self._execute_question(pending_question)
 
     def _render_chat_history(self):
         """渲染聊天历史"""
@@ -256,7 +273,9 @@ class ChatInterface:
                 st.session_state.is_processing
                 or not st.session_state.get("anonymous_token")
             ),
-            max_chars=MAX_QUESTION_LENGTH,
+            # Streamlit counts UTF-16 units; Python validates Unicode code points
+            # before sending an ask. Allow two units for each astral character.
+            max_chars=MAX_QUESTION_LENGTH * 2,
         )
 
         if user_question:
@@ -317,7 +336,7 @@ class ChatInterface:
                 )
                 st.session_state.reset_scope_on_clear = reset_scope
 
-        st.caption(f"问题长度上限：{MAX_QUESTION_LENGTH} 字符")
+        st.caption(f"问题长度上限：{MAX_QUESTION_LENGTH} 字符，超出后请精简再提交。")
 
     def _validate_question(self, question: str) -> Optional[str]:
         """验证问题长度"""
@@ -325,7 +344,7 @@ class ChatInterface:
         if not normalized_question:
             st.warning("⚠️ 请输入有效的问题")
             return None
-        if len(normalized_question) > MAX_QUESTION_LENGTH:
+        if len(question) > MAX_QUESTION_LENGTH:
             st.warning(f"⚠️ 问题长度不能超过{MAX_QUESTION_LENGTH}字符，请精简后重试")
             return None
         return normalized_question
@@ -333,9 +352,20 @@ class ChatInterface:
     def _process_question(self, question: str):
         """处理用户问题"""
 
+        if st.session_state.is_processing:
+            return
         validated_question = self._validate_question(question)
         if validated_question is None:
             return
+        st.session_state.pop("retry_question", None)
+        st.session_state.pending_question = validated_question
+        st.session_state.is_processing = True
+        # Render disabled controls before the synchronous server-side HTTP call.
+        st.rerun()
+
+    def _execute_question(self, validated_question: str):
+        """Execute one queued question after the busy state has been rendered."""
+        question = validated_question
 
         st.session_state.messages.append({"role": "user", "content": question})
 
@@ -434,14 +464,25 @@ class ChatInterface:
                         )
 
                 except requests.exceptions.Timeout:
-                    timeout_msg = "❌ 请求超时，请稍后重试"
+                    st.session_state.retry_question = validated_question
+                    timeout_msg = "❌ 请求超时，可能已计入今日次数，请稍后主动重试。"
                     st.error(timeout_msg)
                     st.session_state.messages.append(
                         {"role": "assistant", "content": timeout_msg}
                     )
 
-                except Exception as e:
-                    error_msg = f"❌ 发生错误: {str(e)}"
+                except requests.exceptions.RequestException:
+                    st.session_state.retry_question = validated_question
+                    error_msg = (
+                        "❌ 网络连接失败，响应丢失不代表未扣额，请检查网络后主动重试。"
+                    )
+                    st.error(error_msg)
+                    st.session_state.messages.append(
+                        {"role": "assistant", "content": error_msg}
+                    )
+
+                except Exception:
+                    error_msg = "❌ 暂时无法处理回答，请稍后主动提交。"
                     st.error(error_msg)
                     st.session_state.messages.append(
                         {"role": "assistant", "content": error_msg}
@@ -514,6 +555,8 @@ class ChatInterface:
             provider = getattr(st.session_state, "byok_provider", "").strip()
             base_url = getattr(st.session_state, "byok_base_url", "").strip()
             model = getattr(st.session_state, "byok_model", "").strip()
+            if not api_key:
+                return headers
             if api_key:
                 headers["LLM-Api-Key"] = api_key
             if provider:
@@ -533,3 +576,4 @@ class ChatInterface:
     def clear_chat_history(self):
         """清空聊天历史"""
         st.session_state.messages = []
+        st.session_state.pop("retry_question", None)

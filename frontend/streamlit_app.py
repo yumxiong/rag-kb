@@ -84,7 +84,7 @@ st.set_page_config(
     page_title="RAG知识库",
     page_icon="📚",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 
@@ -256,6 +256,9 @@ def build_byok_headers() -> dict:
     provider = st.session_state.get("byok_provider", "").strip()
     base_url = st.session_state.get("byok_base_url", "").strip()
     model = st.session_state.get("byok_model", "").strip()
+
+    if not api_key:
+        return headers
 
     if api_key:
         headers["LLM-Api-Key"] = api_key

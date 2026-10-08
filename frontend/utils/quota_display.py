@@ -28,3 +28,7 @@ def render_quota_info(quota: dict, ui) -> None:
             ui.warning("今日个人免费次数已用完；BYOK 是否可用取决于该模式的全站预算。")
     if quota.get("reset_at"):
         ui.caption(f"个人额度重置时间（UTC）：{quota['reset_at']}")
+    ui.caption(
+        "匿名身份仅在当前页面会话内保持；完整刷新或重新连接可能建立新身份。"
+        "与其他前端的个人额度不共享，全站预算仍统一计算。"
+    )

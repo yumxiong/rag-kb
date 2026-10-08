@@ -6,11 +6,12 @@ import time
 from unittest.mock import MagicMock, patch
 
 import pytest
+from fastapi.testclient import TestClient
+
 from app.core.anonymous_session import AnonymousSessionStore, SessionError, bootstrap
 from app.core.config import settings
 from app.main import app
 from app.models.schemas import QuestionResponse
-from fastapi.testclient import TestClient
 from frontend.utils.anonymous_session import ensure_identity, recover_identity
 
 

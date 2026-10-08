@@ -138,6 +138,9 @@ class DocumentManagerComponent(AutoRefreshMixin):
         base_url = st.session_state.get("byok_base_url", "").strip()
         model = st.session_state.get("byok_model", "").strip()
 
+        if not api_key:
+            return headers
+
         if api_key:
             headers["LLM-Api-Key"] = api_key
         if provider:

@@ -107,6 +107,42 @@ def reset_client():
     return function, ui, http
 
 
+@pytest.mark.parametrize(
+    "path,name,is_method",
+    [
+        ("frontend/streamlit_app.py", "build_byok_headers", False),
+        ("frontend/components/chat_interface.py", "_build_byok_headers", True),
+        ("frontend/components/document_manager.py", "_build_byok_headers", True),
+    ],
+)
+def test_default_provider_without_key_sends_no_partial_byok(path, name, is_method):
+    class State(dict):
+        __getattr__ = dict.__getitem__
+
+    state = State(
+        byok_api_key="",
+        byok_provider="openai",
+        byok_model="gpt-3.5-turbo",
+        byok_base_url="",
+    )
+    identity = {"X-Anonymous-Token": "synthetic-token"}
+    function = load_function(
+        path,
+        name,
+        {
+            "st": SimpleNamespace(session_state=state),
+            "identity_headers": lambda *_: dict(identity),
+            "Dict": dict,
+        },
+    )
+    result = (
+        function(SimpleNamespace(backend_url="http://test.invalid"))
+        if is_method
+        else function()
+    )
+    assert result == (identity if "chat_interface" in path else {})
+
+
 def test_admin_reset_sends_target_and_reason():
     function, ui, http = reset_client()
     function("a" * 64, "用户申请更正")

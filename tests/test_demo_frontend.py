@@ -4,11 +4,12 @@ from pathlib import Path
 from unittest.mock import Mock, call, patch
 
 import pytest
+import requests
 
 pytest.importorskip("streamlit")
-from streamlit.testing.v1 import AppTest
+from streamlit.testing.v1 import AppTest  # noqa: E402 - follows importorskip
 
-from app.core.demo_content import DEMO_QUESTIONS
+from app.core.demo_content import DEMO_QUESTIONS  # noqa: E402
 
 SCRIPT = """
 from frontend.components.chat_interface import ChatInterface
@@ -25,6 +26,7 @@ def session_response():
 def session_or_answer(answer):
     def post(url, **kwargs):
         return session_response() if url.endswith("/session/anonymous") else answer
+
     return post
 
 
@@ -48,13 +50,15 @@ def test_example_submits_anonymously_and_preserves_sources():
         ),
     ), patch(
         "requests.post",
-        side_effect=session_or_answer(response(
-            {
-                "answer": "网页上传上限为 40 MB。",
-                "sources": sources,
-                "processing_time": 0.1,
-            }
-        )),
+        side_effect=session_or_answer(
+            response(
+                {
+                    "answer": "网页上传上限为 40 MB。",
+                    "sources": sources,
+                    "processing_time": 0.1,
+                }
+            )
+        ),
     ) as post:
         at = AppTest.from_string(SCRIPT).run()
         assert not at.exception
@@ -137,12 +141,87 @@ def test_full_homepage_is_available_without_login(monkeypatch):
 
     with patch("requests.get", side_effect=get), patch(
         "requests.post", return_value=session_response()
-    ), patch(
-        "utils.settings_loader._read_browser_settings", return_value={}
-    ):
+    ), patch("utils.settings_loader._read_browser_settings", return_value={}):
         at = AppTest.from_file(str(root / "frontend/streamlit_app.py")).run()
     assert not at.exception
     assert any("虚构产品文档" in info.value for info in at.info)
     assert len([b for b in at.button if (b.key or "").startswith("suggestion_")]) == 4
     assert not at.get("file_uploader")
     assert "admin_jwt" not in at.session_state
+
+
+@pytest.mark.parametrize("failure", [requests.ConnectionError, requests.Timeout])
+def test_network_failure_waits_for_explicit_retry_without_rotating_identity(failure):
+    with patch(
+        "requests.get",
+        return_value=response(
+            {"suggestions": list(DEMO_QUESTIONS), "document_count": 9}
+        ),
+    ), patch(
+        "requests.post",
+        side_effect=[
+            session_response(),
+            failure("private-upstream-detail"),
+            response({"answer": "retry answer", "sources": [], "processing_time": 0}),
+        ],
+    ) as post:
+        at = AppTest.from_string(SCRIPT).run()
+        at.button(key="suggestion_0").click().run()
+        assert not at.exception
+        assert post.call_count == 2
+        assert "private-upstream-detail" not in str(at.session_state.messages)
+        assert at.session_state.anonymous_token == TOKEN
+        assert not at.session_state.is_processing
+        at.run()
+        assert post.call_count == 2
+        at.button(key="retry_failed_question").click().run()
+        assert not at.exception
+        assert post.call_count == 3
+        assert post.call_args.kwargs["headers"] == {"X-Anonymous-Token": TOKEN}
+        assert at.session_state.messages[-1]["content"] == "retry answer"
+        assert "retry_question" not in at.session_state
+
+
+def test_processing_guard_rejects_reentrant_submission():
+    script = """
+import streamlit as st
+from frontend.components.chat_interface import ChatInterface
+chat = ChatInterface('http://demo-test.invalid')
+st.session_state.is_processing = True
+chat._process_question('duplicate')
+"""
+    with patch("requests.post") as post:
+        at = AppTest.from_string(script).run()
+    assert not at.exception
+    post.assert_not_called()
+    assert at.session_state.messages == []
+
+
+@pytest.mark.parametrize(
+    "question,accepted",
+    [
+        ("😀" * 2000, True),
+        ("中" * 2000, True),
+        ("😀" * 2001, False),
+        ("中" * 2001, False),
+        (" " + "中" * 2000, False),
+    ],
+)
+def test_unicode_question_boundary_precedes_ask(question, accepted):
+    with patch(
+        "requests.get", return_value=response({"suggestions": [], "document_count": 1})
+    ), patch(
+        "requests.post",
+        side_effect=session_or_answer(
+            response({"answer": "boundary answer", "sources": [], "processing_time": 0})
+        ),
+    ) as post:
+        at = AppTest.from_string(SCRIPT).run()
+        at.chat_input[0].set_value(question).run()
+    assert not at.exception
+    asks = [c for c in post.call_args_list if c.args[0].endswith("/qa/ask")]
+    assert len(asks) == int(accepted)
+    if accepted:
+        assert asks[0].kwargs["json"]["question"] == question
+    else:
+        assert any("2000" in w.value for w in at.warning)

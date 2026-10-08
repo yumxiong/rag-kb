@@ -89,6 +89,9 @@ build/
 dist/
 *.egg-info/
 
+# Local synthetic acceptance runtime (contains disposable identity credentials)
+/rag-step5-local-*/
+
 # Docker
 docker/docker-compose.secrets.yml
 docker/docker-compose.production.yml
