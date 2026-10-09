@@ -115,9 +115,7 @@ def probe():
     ]:
         time.sleep(0.6)
         started = time.monotonic()
-        status, headers, body = request(
-            "/api/qa/ask", {"mode": mode}, timeout=105
-        )
+        status, headers, body = request("/api/qa/ask", {"mode": mode}, timeout=105)
         elapsed = time.monotonic() - started
         assert status == expected and json.loads(body)["detail"]["code"] == code
         assert headers["X-Request-ID"] != "synthetic-gateway"

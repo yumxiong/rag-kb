@@ -68,7 +68,9 @@ class EngineFixture:
             if question == "failure":
                 raise RuntimeError("synthetic")
             return QuestionResponse(
-                answer="synthetic answer", sources=[], processing_time=0,
+                answer="synthetic answer",
+                sources=[],
+                processing_time=0,
                 from_cache=question == "cached",
             )
         finally:
@@ -111,7 +113,12 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(
-        app, host="0.0.0.0", port=8000, workers=1, access_log=False,
-        log_level="critical", proxy_headers=True,
+        app,
+        host="0.0.0.0",
+        port=8000,
+        workers=1,
+        access_log=False,
+        log_level="critical",
+        proxy_headers=True,
         forwarded_allow_ips="172.30.245.3",
     )

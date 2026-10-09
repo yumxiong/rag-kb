@@ -30,7 +30,8 @@ class Client:
         if body is not None:
             headers["Content-Type"] = "application/json"
         req = urllib.request.Request(
-            ORIGIN + path, headers=headers,
+            ORIGIN + path,
+            headers=headers,
             data=None if body is None else json.dumps(body).encode(),
         )
         try:
@@ -91,7 +92,9 @@ def main():
     cookie = "; ".join(f"{c.name}={c.value}" for c in b.jar)
     connection = http.client.HTTPSConnection("localhost", 18443, context=TLS)
     connection.request(
-        "POST", "/api/qa/ask", json.dumps({"question": "cancel-slow"}),
+        "POST",
+        "/api/qa/ask",
+        json.dumps({"question": "cancel-slow"}),
         {"Origin": ORIGIN, "Cookie": cookie, "Content-Type": "application/json"},
     )
     time.sleep(1)
