@@ -1,0 +1,49 @@
+# Standalone synthetic acceptance project. Do not combine with production files.
+services:
+  next:
+    build:
+      context: ../v0.app-rag
+      args:
+        RAG_BACKEND_ORIGIN: http://backend:8000
+    networks: [smoke]
+
+  backend:
+    image: node:24.16.0-bookworm-slim
+    command: [node, /fixture/gateway_fixture.mjs]
+    user: node
+    volumes:
+      - type: bind
+        source: ../scripts/acceptance/step5/gateway_fixture.mjs
+        target: /fixture/gateway_fixture.mjs
+        read_only: true
+        bind:
+          create_host_path: false
+    networks: [smoke]
+
+  gateway:
+    image: nginx:1.28-alpine
+    ports: ["127.0.0.1:18443:443"]
+    volumes:
+      - type: bind
+        source: ../rag-step5-local-next-gateway/next.conf
+        target: /etc/nginx/conf.d/default.conf
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ../rag-step5-local-next-gateway/certs
+        target: /etc/nginx/smoke-certs
+        read_only: true
+        bind:
+          create_host_path: false
+    depends_on:
+      next:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    networks: [smoke, ingress]
+
+networks:
+  ingress:
+  smoke:
+    internal: true

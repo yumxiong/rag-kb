@@ -1,0 +1,104 @@
+# Additional virtual host: preserve the existing Streamlit host/root.
+# Substitute ONLY NEXT_DOMAIN, NEXT_TLS_CERT and NEXT_TLS_KEY.
+# Certificate paths are container paths on the existing Nginx certificate mount.
+limit_req_zone $binary_remote_addr zone=next_api_general:10m rate=10r/s;
+limit_req_zone $binary_remote_addr zone=next_qa_ask:10m rate=2r/s;
+limit_req_zone $binary_remote_addr zone=next_auth_login:10m rate=5r/m;
+limit_req_zone $binary_remote_addr zone=next_session_init:10m rate=1r/s;
+map $uri $next_rate_retry_after {
+    default 1;
+    /api/auth/login 60;
+}
+
+server {
+    listen 80;
+    server_name ${NEXT_DOMAIN};
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name ${NEXT_DOMAIN};
+    ssl_certificate ${NEXT_TLS_CERT};
+    ssl_certificate_key ${NEXT_TLS_KEY};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options SAMEORIGIN always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+
+    # The backend continues to trust only Nginx's existing fixed address.
+    # Never append a client's claimed forwarding chain.
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header Connection "";
+    proxy_http_version 1.1;
+    proxy_cache off;
+    proxy_intercept_errors off;
+    # Do not replay a POST, even on an upstream transport error.
+    proxy_next_upstream off;
+    proxy_connect_timeout 10s;
+    proxy_send_timeout 60s;
+    proxy_read_timeout 60s;
+    client_max_body_size 50M;
+    limit_req_status 429;
+    error_page 429 = @next_rate_limited;
+    error_page 502 = @next_upstream_failed;
+    error_page 504 = @next_upstream_timed_out;
+
+    location /api/auth/login {
+        limit_req zone=next_auth_login burst=5 nodelay;
+        proxy_pass http://backend:8000;
+    }
+    location /api/session/anonymous {
+        limit_req zone=next_session_init burst=5 nodelay;
+        proxy_pass http://backend:8000;
+    }
+    location /api/qa/ask {
+        limit_req zone=next_qa_ask burst=4 nodelay;
+        proxy_read_timeout 90s;
+        proxy_pass http://backend:8000;
+    }
+    location /api/ {
+        limit_req zone=next_api_general burst=20 nodelay;
+        proxy_pass http://backend:8000;
+    }
+    location = /api { return 404; }
+    location = /docs { return 404; }
+    location = /redoc { return 404; }
+    location = /openapi.json { return 404; }
+    location /ws/ { return 404; }
+
+    location / {
+        proxy_pass http://next:3000;
+    }
+
+    location @next_rate_limited {
+        default_type application/json;
+        add_header Cache-Control "no-store" always;
+        add_header Retry-After $next_rate_retry_after always;
+        add_header X-Request-ID $request_id always;
+        return 429 '{"detail":{"code":"rate_limited","message":"Request rate limited.","request_id":"$request_id","retry_after_seconds":$next_rate_retry_after}}';
+    }
+    location @next_upstream_failed {
+        default_type application/json;
+        add_header Cache-Control "no-store" always;
+        add_header X-Request-ID $request_id always;
+        return 502 '{"detail":{"code":"upstream_error","message":"Upstream service unavailable.","request_id":"$request_id"}}';
+    }
+    location @next_upstream_timed_out {
+        default_type application/json;
+        add_header Cache-Control "no-store" always;
+        add_header X-Request-ID $request_id always;
+        return 504 '{"detail":{"code":"upstream_timeout","message":"Upstream request timed out.","request_id":"$request_id"}}';
+    }
+}

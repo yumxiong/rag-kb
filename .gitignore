@@ -98,6 +98,7 @@ docker/docker-compose.production.yml
 docker/docker-compose.certbot.override.yml
 docker/nginx/conf.d/production.conf
 docker/nginx/conf.d/production-init.conf
+docker/nginx/conf.d/next.conf
 # md
 ADMIN_BUTTON_TEST_REPORT.md
 STREAMLIT_VERSION_VERIFICATION.md

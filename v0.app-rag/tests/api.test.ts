@@ -75,6 +75,31 @@ for (const [status, code] of [[429, "quota_exceeded"], [429, "rate_limited"], [5
   })
 }
 
+for (const { name, bodyDelay, headerDelay, expected } of [
+  { name: "contract body fallback", bodyDelay: 12, headerDelay: undefined, expected: 12 },
+  { name: "header only", bodyDelay: undefined, headerDelay: "7", expected: 7 },
+  { name: "header takes precedence", bodyDelay: 12, headerDelay: "7", expected: 7 },
+]) {
+  test(`retry delay: ${name}, without replaying ask`, async () => {
+    let calls = 0
+    globalThis.fetch = async () => {
+      calls++
+      return Response.json(
+        { detail: { code: "rate_limited", message: "test", request_id: "retry-test", retry_after_seconds: bodyDelay } },
+        { status: 429, headers: headerDelay === undefined ? {} : { "Retry-After": headerDelay } },
+      )
+    }
+    await assert.rejects(ask("问题"), (error: ApiError) => {
+      assert.equal(error.code, "rate_limited")
+      assert.equal(error.status, 429)
+      assert.equal(error.requestId, "retry-test")
+      assert.equal(error.retryAfter, expected)
+      return true
+    })
+    assert.equal(calls, 1)
+  })
+}
+
 test("HTML and malformed success bodies never become answers", async () => {
   globalThis.fetch = async () => new Response("<h1>gateway</h1>", { status: 502, headers: { "Content-Type": "text/html", "X-Request-ID": "gateway" } })
   await assert.rejects(ask("问题"), (error: ApiError) => error.code === "invalid_response" && error.requestId === "gateway")

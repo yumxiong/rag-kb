@@ -1,0 +1,47 @@
+# Independent real-admission acceptance; never combine with production files.
+services:
+  next:
+    image: rag-step5-next-smoke-next:latest
+    networks:
+      isolated:
+        ipv4_address: 172.30.245.4
+  backend:
+    image: sha256:168bc2ec9e66a7f8f749996fcf882b1f7f4f1662c0dc27f1375948938b553387
+    entrypoint: [python, /fixture/real_gateway_fixture.py]
+    working_dir: /tmp
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app
+    environment:
+      PYTHONDONTWRITEBYTECODE: "1"
+    healthcheck:
+      disable: true
+    volumes:
+      - ../app:/workspace/app:ro
+      - ../scripts/acceptance/step5/real_gateway_fixture.py:/fixture/real_gateway_fixture.py:ro
+    networks:
+      isolated:
+        ipv4_address: 172.30.245.2
+  gateway:
+    image: nginx:1.28-alpine
+    ports: ["127.0.0.1:18443:443"]
+    volumes:
+      - ../rag-step5-local-next-gateway/next.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../rag-step5-local-next-gateway/certs:/etc/nginx/smoke-certs:ro
+    depends_on:
+      next:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    networks:
+      ingress:
+      isolated:
+        ipv4_address: 172.30.245.3
+networks:
+  ingress:
+  isolated:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.30.245.0/24

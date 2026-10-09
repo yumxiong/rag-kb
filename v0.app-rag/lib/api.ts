@@ -68,9 +68,9 @@ export async function request<T>(path: string, schema: z.ZodType<T>, body?: obje
     let value: unknown
     try { value = await response.json() } catch { throw new ApiError("invalid_response", response.status, requestId) }
     if (!response.ok) {
-      const parsed = z.object({ detail: z.object({ code: z.string(), message: z.string(), request_id: z.string(), retry_after: z.number().optional() }) }).safeParse(value)
+      const parsed = z.object({ detail: z.object({ code: z.string(), message: z.string(), request_id: z.string(), retry_after_seconds: z.number().optional() }) }).safeParse(value)
       const detail = parsed.success ? parsed.data.detail : undefined
-      const delay = Number(response.headers.get("Retry-After") ?? detail?.retry_after)
+      const delay = Number(response.headers.get("Retry-After") ?? detail?.retry_after_seconds)
       throw new ApiError(detail?.code ?? "invalid_response", response.status, detail?.request_id ?? requestId, Number.isFinite(delay) && delay > 0 ? delay : undefined)
     }
     const parsed = schema.safeParse(value)
