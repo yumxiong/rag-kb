@@ -49,6 +49,7 @@ docker/docker-compose.secrets.yml
 docker/docker-compose.certbot.override.yml
 docker/nginx/conf.d/production.conf
 docker/nginx/conf.d/production-init.conf
+docker/nginx/conf.d/next.conf
 
 # Local editor and OS files
 .vscode/
@@ -64,6 +65,13 @@ Thumbs.db
 build/
 dist/
 *.egg-info/
+**/node_modules/
+**/.next/
+**/.pnpm-store/
+**/*.tsbuildinfo
+.step4-evidence/
+.step4-run/
+rag-step5-local-*/
 
 # Backups, local tooling and generated evaluation artifacts
 *.bak

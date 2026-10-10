@@ -2,25 +2,51 @@
 问答API
 """
 
+import asyncio
 import logging
+import uuid
+from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from pydantic import BaseModel, Field
 
+from app.api.anonymous_session import require_identity, store
 from app.api.auth import require_admin
+from app.core.anonymous_session import SessionError
 from app.core.config import settings
+from app.core.deadline import QuestionDeadline, deadline_scope
+from app.core.demo_content import DEMO_QUESTIONS
 from app.core.qa_engine import QAEngine
 from app.core.url_safety import is_safe_base_url
 from app.core.vector_store import VectorStore
-from app.models.schemas import QuestionRequest, QuestionResponse, SourceDocument
+from app.models.schemas import QuestionRequest, QuestionResponse
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+
+class QuotaResetRequest(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    quota_ref: str = Field(pattern=r"^[0-9a-f]{64}$")
+    reason: str = Field(min_length=1, max_length=200)
+
+
 # 全局实例（延迟初始化）
 vector_store = None
 qa_engine = None
+
+
+def _release_question_leases(leases):
+    for lease in leases:
+        lease.release()
+
+
+def _is_timeout_error(error: BaseException) -> bool:
+    """Recognize provider timeout classes without exposing provider details."""
+    return isinstance(error, TimeoutError) or "timeout" in type(error).__name__.lower()
 
 
 def get_vector_store():
@@ -47,44 +73,52 @@ def _extract_overrides_from_headers(request) -> dict:
     - LLM-Base-URL: 自定义兼容 OpenAI 的 API Base URL
     - LLM-Model: 聊天模型名称
     """
-    overrides = {}
-    try:
-        api_key = request.headers.get("LLM-Api-Key")
-        if api_key:
-            overrides["api_key"] = api_key.strip()
-
-        provider = request.headers.get("LLM-Provider")
-        if provider:
-            overrides["provider"] = (
-                provider.strip()
-                if provider.strip()
-                in ["openai", "deepseek", "zhipu", "openrouter", "custom"]
-                else "openai"
+    names = {
+        "api_key": "LLM-Api-Key",
+        "provider": "LLM-Provider",
+        "api_base_url": "LLM-Base-URL",
+        "model": "LLM-Model",
+    }
+    overrides = {
+        key: request.headers[name].strip()
+        for key, name in names.items()
+        if name in request.headers
+    }
+    if not overrides:
+        return overrides
+    if not overrides.get("api_key") or not all(overrides.values()):
+        raise SessionError("invalid_request", 400)
+    if "provider" in overrides and overrides["provider"] not in {
+        "openai",
+        "deepseek",
+        "zhipu",
+        "openrouter",
+        "custom",
+    }:
+        raise SessionError("invalid_request", 400)
+    if "api_base_url" in overrides:
+        try:
+            safe = is_safe_base_url(
+                overrides["api_base_url"], settings.get_allowed_chat_base_urls()
             )
-
-        base_url = request.headers.get("LLM-Base-URL")
-        if base_url:
-            if not api_key:
-                raise HTTPException(status_code=400, detail="需提供LLM-Api-Key")
-            if not is_safe_base_url(base_url, settings.get_allowed_chat_base_urls()):
-                raise HTTPException(status_code=400, detail="LLM-Base-URL 不安全")
-            overrides["api_base_url"] = base_url
-
-        model = request.headers.get("LLM-Model")
-        if model:
-            overrides["model"] = model
-    except Exception:
-        # 安全兜底：出现异常则返回当前累积的 overrides
-        pass
+        except Exception:
+            safe = False
+        if not safe:
+            raise SessionError("invalid_request", 400)
     return overrides
 
 
 @router.post("/ask", response_model=QuestionResponse)
-async def ask_question(payload: QuestionRequest, request: Request):
+async def ask_question(
+    payload: QuestionRequest,
+    request: Request,
+    http_response: Response,
+    identity: dict = Depends(require_identity),
+):
     """智能问答接口"""
     try:
         if not payload.question.strip():
-            raise HTTPException(status_code=400, detail="Question cannot be empty")
+            raise SessionError("invalid_request", 400)
 
         # 问题长度验证
         from app.core.config import settings
@@ -93,199 +127,131 @@ async def ask_question(payload: QuestionRequest, request: Request):
             len(payload.question) < settings.min_question_length
             or len(payload.question) > settings.max_question_length
         ):
-            raise HTTPException(status_code=400, detail="Question length out of range")
+            raise SessionError("invalid_request", 400)
+
+        overrides = _extract_overrides_from_headers(request)
+        has_custom_key = bool(overrides.get("api_key"))
+        request.app.state.session_rate_limit.check_identity(
+            identity["quota_ref"],
+            "ask",
+            settings.max_ask_requests_per_minute,
+        )
 
         # 检查是否有文档数据
         collection_info = get_vector_store().get_collection_info()
         if collection_info.get("document_count", 0) == 0:
-            return QuestionResponse(
-                answer="抱歉，知识库中暂时没有文档。请先上传一些文档后再提问。",
-                sources=[],
-                processing_time=0.0,
-            )
+            raise SessionError("knowledge_base_unavailable", 503)
 
-        # 提取BYOK覆盖，并按需选择引擎
-        overrides = _extract_overrides_from_headers(request)
-        has_custom_key = bool(overrides.get("api_key"))
-
-        # 配额检查（仅对未提供自定义API Key的用户）
-        from app.core.config import settings
-
-        if settings.enable_quota_limit:
-            from app.core.quota_manager import get_quota_manager
-
-            quota_manager = get_quota_manager()
-
-            # 构建请求信息
-            request_info = {
-                "client_ip": request.client.host if request.client else "unknown",
-                "user_agent": request.headers.get("user-agent", ""),
-            }
-
-            # 检查配额
-            can_use, quota_info = quota_manager.check_and_increment(
-                request_info, has_custom_key
-            )
-
-            if not can_use:
-                return QuestionResponse(
-                    answer=(
-                        f"🚫 **配额已用完**\n\n"
-                        f"您今日的免费提问次数已达上限（{quota_info.daily_limit}次），明天将自动重置。\n\n"
-                        f"💡 **解决方案**：\n"
-                        f"1. 等待明天配额重置\n"
-                        f'2. 在左侧"模型设置(BYOK)"中填写您的API Key，即可无限制使用\n\n'
-                        f"📊 **当前使用情况**：{quota_info.used_count}/{quota_info.daily_limit}"
-                    ),
-                    sources=[],
-                    processing_time=0.0,
-                )
-
-            # 在响应中添加配额信息（用于前端显示）
-            remaining_quota = max(0, quota_info.daily_limit - quota_info.used_count)
-            logger.info(
-                "User quota: %s/%s, remaining: %s",
-                quota_info.used_count,
-                quota_info.daily_limit,
-                remaining_quota,
-            )
+        limits = settings.budget_limits()
 
         engine = None
         if overrides.get("api_key"):
             # 用户提供了 Key，创建临时引擎（不影响全局实例与测试桩）
             engine = QAEngine(get_vector_store(), overrides=overrides)
         else:
-            # 未提供 Key：若全局尚未初始化且也无默认 Key，则走 Demo 回退；
-            # 若测试中已用 mock 注入了 qa_engine，则直接复用以保持单测稳定。
+            # 未提供自定义 Key 时只使用部署固定的默认引擎。
             if qa_engine is None and not settings.get_api_key():
-                try:
-                    k = payload.max_sources or settings.max_sources
-                    fallback_note = ""
-
-                    # 使用带分数检索进行判定（更稳健）
-                    docs = []
-                    if payload.document_id:
-                        try:
-                            restricted_scored = (
-                                get_vector_store().similarity_search_with_score(
-                                    query=payload.question,
-                                    k=max(k, settings.max_sources * 2),
-                                    filter_dict={"document_id": payload.document_id},
-                                    threshold=settings.relevance_fallback_threshold,
-                                )
-                            )
-                        except Exception as _e:
-                            logger.warning(f"Demo scored restricted failed: {_e}")
-                            restricted_scored = []
-                        try:
-                            global_scored = (
-                                get_vector_store().similarity_search_with_score(
-                                    query=payload.question,
-                                    k=max(k, settings.max_sources * 2),
-                                    filter_dict=None,
-                                    threshold=settings.relevance_fallback_threshold,
-                                )
-                            )
-                        except Exception as _e:
-                            logger.warning(f"Demo scored global failed: {_e}")
-                            global_scored = []
-
-                        best_restricted = min(
-                            [s for (_, s) in restricted_scored], default=None
-                        )
-                        best_global = min([s for (_, s) in global_scored], default=None)
-
-                        should_fallback = False
-                        if best_restricted is None and best_global is not None:
-                            should_fallback = True
-                        elif best_restricted is not None and best_global is not None:
-                            margin = getattr(settings, "relevance_fallback_margin", 0.1)
-                            if best_global + margin < best_restricted:
-                                should_fallback = True
-
-                        if should_fallback:
-                            if len(global_scored) > 0:
-                                docs = [doc for (doc, _) in global_scored][
-                                    : max(k, settings.max_sources)
-                                ]
-                                fallback_note = (
-                                    "提示：在您选定的文档中未检索到更相关的内容，"
-                                    "已自动在全库中扩大检索范围。\n\n"
-                                )
-                            else:
-                                docs = []
-                                fallback_note = "提示：在您选定的文档以及全库中均未检索到相关内容。\n\n"
-                        else:
-                            docs = [doc for (doc, _) in restricted_scored][:k]
-                    else:
-                        # 全库检索（不加阈值过滤，直接返回 top-k）
-                        docs = get_vector_store().similarity_search(
-                            query=payload.question, k=max(k, settings.max_sources)
-                        )
-                    sources = []
-                    for doc in docs:
-                        content = doc.page_content
-                        if len(content) > 300:
-                            content = content[:300] + "..."
-                        sources.append(
-                            SourceDocument(
-                                document_name=doc.metadata.get("filename", "Unknown"),
-                                content=content,
-                                similarity_score=1.0,
-                                page_number=doc.metadata.get("page"),
-                            )
-                        )
-                    return QuestionResponse(
-                        answer=(
-                            f"{fallback_note}"
-                            + "当前处于 Demo 模式，尚未提供 LLM API Key，因此仅展示检索到的相关内容片段。\n"
-                            "请在左侧“模型设置(BYOK)”中填写 API Key 后重试，以生成完整答案。"
-                        ),
-                        sources=sources,
-                        processing_time=0.0,
-                    )
-                except Exception as demo_e:
-                    return QuestionResponse(
-                        answer=f"当前处于 Demo 模式且未配置 API Key。无法进行生成，仅提示：{str(demo_e)}",
-                        sources=[],
-                        processing_time=0.0,
-                    )
-            # 使用默认全局引擎（便于单元测试使用 mock）
+                raise SessionError("service_unavailable", 503)
             engine = get_qa_engine()
 
-        # 执行问答（信号量保护，防止 LLM 并发过载）
-        import asyncio
-
-        from app.core.concurrency import get_llm_semaphore
-
-        semaphore = get_llm_semaphore()
-        if semaphore._value == 0:
-            logger.warning("LLM semaphore exhausted, rejecting ask request")
-            raise HTTPException(status_code=503, detail="服务器繁忙，请稍后重试")
-        async with semaphore:
-            response = await asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: engine.ask(
-                    question=payload.question,
-                    max_sources=payload.max_sources,
-                    document_id=payload.document_id,
-                ),
-            )
-
-        return response
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error in ask_question: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Question processing failed: {str(e)}"
+        from app.core.concurrency import (
+            get_identity_gate,
+            get_llm_gate,
+            get_qa_executor,
         )
+        from app.core.global_budget import question_budget
+
+        identity_lease = get_identity_gate().try_acquire(identity["quota_ref"])
+        llm_lease = get_llm_gate().try_acquire()
+        if identity_lease is None or llm_lease is None:
+            if identity_lease is not None:
+                identity_lease.release()
+            if llm_lease is not None:
+                llm_lease.release()
+            logger.warning("Question concurrency exhausted, rejecting ask request")
+            raise SessionError("service_busy", 503, 1)
+
+        submitted = False
+        try:
+            store(request).admit(
+                identity,
+                byok=has_custom_key,
+                personal_limit=(
+                    settings.default_daily_quota
+                    if settings.enable_quota_limit
+                    else None
+                ),
+                limits=limits,
+            )
+            deadline = QuestionDeadline(
+                overall_seconds=settings.question_deadline_seconds,
+                embedding_seconds=settings.embedding_timeout_seconds,
+                chat_seconds=settings.chat_timeout_seconds,
+            )
+            deadline.check()
+
+            def run_question():
+                with deadline_scope(deadline), question_budget(
+                    store(request), byok=has_custom_key, limits=limits
+                ):
+                    return engine.ask(
+                        question=payload.question,
+                        max_sources=payload.max_sources,
+                        document_id=payload.document_id,
+                    )
+
+            worker_future = get_qa_executor().submit(run_question)
+            submitted = True
+            worker_future.add_done_callback(
+                lambda _: _release_question_leases((identity_lease, llm_lease))
+            )
+            worker = asyncio.wrap_future(worker_future)
+            try:
+                answer_response = await asyncio.wait_for(
+                    asyncio.shield(worker), timeout=deadline.remaining()
+                )
+            except asyncio.TimeoutError:
+                deadline.cancel()
+                raise SessionError("upstream_timeout", 504) from None
+            except asyncio.CancelledError:
+                deadline.cancel()
+                # The concurrent future still owns both leases until the thread exits.
+                raise
+            except SessionError:
+                raise
+            except Exception as error:
+                if _is_timeout_error(error):
+                    raise SessionError("upstream_timeout", 504) from None
+                logger.error("Question provider failed")
+                raise SessionError("upstream_error", 502) from None
+        finally:
+            if not submitted:
+                _release_question_leases((identity_lease, llm_lease))
+
+        request_id = str(uuid.uuid4())
+        answer_response = answer_response.model_copy(update={"request_id": request_id})
+        http_response.headers["X-Request-ID"] = request_id
+        http_response.headers["Cache-Control"] = "no-store"
+        logger.info(
+            "ask request_id=%s identity=%s result=%s",
+            request_id,
+            identity["quota_ref"],
+            "cache" if answer_response.from_cache else "answered",
+        )
+        return answer_response
+
+    except (HTTPException, SessionError):
+        raise
+    except Exception:
+        logger.error("Question processing failed")
+        raise SessionError("internal_error", 500) from None
 
 
 @router.post("/search")
 async def search_documents(payload: QuestionRequest, request: Request):
     """文档检索接口（不生成答案）"""
+    if not settings.anonymous_storage_development:
+        raise SessionError("feature_disabled", 403)
     try:
         if not payload.question.strip():
             raise HTTPException(status_code=400, detail="Query cannot be empty")
@@ -345,20 +311,11 @@ async def get_question_suggestions():
         collection_info = get_vector_store().get_collection_info()
 
         if collection_info.get("document_count", 0) == 0:
-            return {"suggestions": ["请先上传一些文档", "知识库目前为空"]}
-
-        # 返回一些通用的问题模板
-        suggestions = [
-            "这个文档讲的是什么？",
-            "有什么重要的信息？",
-            "能总结一下主要内容吗？",
-            "有哪些关键要点？",
-            "这个主题的详细说明是什么？",
-        ]
+            return {"suggestions": [], "document_count": 0}
 
         return {
-            "suggestions": suggestions,
-            "document_count": collection_info.get("document_count", 0),
+            "suggestions": list(DEMO_QUESTIONS),
+            "document_count": len(get_vector_store().list_documents()),
         }
 
     except Exception as e:
@@ -406,6 +363,10 @@ async def qa_health_check(
     _: dict = Depends(require_admin),
 ):
     """问答系统健康检查"""
+    if (deep or with_qa) and not settings.anonymous_storage_development:
+        raise SessionError("feature_disabled", 403)
+    if not settings.anonymous_storage_development:
+        deep = False
     try:
         health_info = get_qa_engine().health_check(deep=deep, with_qa=with_qa)
 
@@ -488,125 +449,107 @@ async def clear_all_cache(_: dict = Depends(require_admin)):
 
 
 @router.get("/quota")
-async def get_quota_info(request: Request):
+async def get_quota_info(
+    request: Request,
+    response: Response,
+    identity: dict = Depends(require_identity),
+):
     """获取当前用户配额信息"""
     try:
         from app.core.config import settings
 
-        if not settings.enable_quota_limit:
-            return {"quota_enabled": False, "message": "Quota limit is disabled"}
-
-        from app.core.quota_manager import get_quota_manager
-
-        quota_manager = get_quota_manager()
-
-        # 构建请求信息
-        request_info = {
-            "client_ip": request.client.host if request.client else "unknown",
-            "user_agent": request.headers.get("user-agent", ""),
-        }
+        request.app.state.session_rate_limit.check_identity(
+            identity["quota_ref"],
+            "quota",
+            settings.max_quota_requests_per_minute,
+        )
 
         # 检查是否使用了自定义API Key
         overrides = _extract_overrides_from_headers(request)
         has_custom_key = bool(overrides.get("api_key"))
 
-        if has_custom_key:
-            return {
-                "quota_enabled": True,
-                "has_custom_key": True,
-                "used_count": 0,
-                "daily_limit": "unlimited",
-                "remaining": "unlimited",
-                "message": "Using custom API key - no quota limit",
-            }
-
-        # 获取配额信息
-        quota_info = quota_manager.get_quota_info(request_info)
-        remaining = max(0, quota_info.daily_limit - quota_info.used_count)
-
-        return {
-            "quota_enabled": True,
-            "has_custom_key": False,
-            "used_count": quota_info.used_count,
-            "daily_limit": quota_info.daily_limit,
-            "remaining": remaining,
-            "last_reset_date": quota_info.last_reset_date,
-            "message": (
-                f"Using default API key - {remaining}/{quota_info.daily_limit} "
-                "questions remaining today"
+        snapshot = store(request).quota_snapshot(
+            identity,
+            byok=has_custom_key,
+            personal_limit=(
+                settings.default_daily_quota if settings.enable_quota_limit else None
             ),
+            limits=settings.budget_limits(),
+        )
+        used = snapshot["used_count"]
+        limit = (
+            settings.default_daily_quota
+            if (settings.enable_quota_limit and not has_custom_key)
+            else None
+        )
+        reset_at = snapshot["global_budget"]["reset_at"]
+        request_id = str(uuid.uuid4())
+        response.headers["X-Request-ID"] = request_id
+        response.headers["Cache-Control"] = "no-store"
+        return {
+            "quota_enabled": settings.enable_quota_limit,
+            "has_custom_key": has_custom_key,
+            "used_count": used,
+            "daily_limit": limit,
+            "remaining": max(0, limit - used) if limit is not None else None,
+            "reset_at": reset_at,
+            "global_budget": snapshot["global_budget"],
+            "request_id": request_id,
         }
 
-    except Exception as e:
-        logger.error(f"Error getting quota info: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get quota info: {str(e)}"
-        )
+    except SessionError:
+        raise
+    except Exception:
+        logger.error("Error getting quota info")
+        raise SessionError("internal_error", 500) from None
 
 
 @router.post("/quota/reset")
-async def reset_quota(request: Request, _: dict = Depends(require_admin)):
-    """重置当前用户配额（管理员功能）"""
-    try:
-        from app.core.config import settings
-
-        if not settings.enable_quota_limit:
-            raise HTTPException(status_code=400, detail="Quota limit is disabled")
-
-        from app.core.quota_manager import get_quota_manager
-
-        quota_manager = get_quota_manager()
-
-        # 构建请求信息
-        request_info = {
-            "client_ip": request.client.host if request.client else "unknown",
-            "user_agent": request.headers.get("user-agent", ""),
-        }
-
-        # 重置配额
-        success = quota_manager.reset_user_quota(request_info)
-
-        if success:
-            return {"success": True, "message": "User quota reset successfully"}
-        else:
-            return {
-                "success": False,
-                "message": "User not found or quota already at zero",
-            }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error resetting quota: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to reset quota: {str(e)}")
+async def reset_quota(
+    payload: QuotaResetRequest,
+    request: Request,
+    response: Response,
+    admin: dict = Depends(require_admin),
+):
+    """Reset one anonymous identity's current UTC personal count."""
+    request_id = str(uuid.uuid4())
+    if not store(request).reset_personal(payload.quota_ref):
+        raise SessionError("quota_not_found", 404)
+    logger.info(
+        "quota reset time=%s actor=%s identity=%s request_id=%s",
+        datetime.now(timezone.utc).isoformat(),
+        admin["sub"],
+        payload.quota_ref,
+        request_id,
+    )
+    response.headers["X-Request-ID"] = request_id
+    response.headers["Cache-Control"] = "no-store"
+    return {"success": True, "request_id": request_id}
 
 
 @router.get("/quota/stats")
-async def get_all_quota_stats(_: dict = Depends(require_admin)):
-    """获取所有用户配额统计（管理员功能）"""
-    try:
-        from app.core.config import settings
+async def get_all_quota_stats(
+    request: Request, response: Response, _: dict = Depends(require_admin)
+):
+    """Return only current UTC counts keyed by token digest."""
+    request_id = str(uuid.uuid4())
+    response.headers["X-Request-ID"] = request_id
+    response.headers["Cache-Control"] = "no-store"
+    return {
+        **store(request).quota_stats(settings.default_daily_quota),
+        "request_id": request_id,
+    }
 
-        if not settings.enable_quota_limit:
-            raise HTTPException(status_code=400, detail="Quota limit is disabled")
 
-        from app.core.quota_manager import get_quota_manager
-
-        quota_manager = get_quota_manager()
-
-        all_quotas = quota_manager.get_all_quotas()
-
-        return {
-            "success": True,
-            "total_users": len(all_quotas),
-            "quotas": all_quotas,
-            "default_daily_limit": settings.default_daily_quota,
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting quota stats: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get quota stats: {str(e)}"
-        )
+@router.get("/budget")
+async def get_budget(
+    request: Request, response: Response, _: dict = Depends(require_admin)
+):
+    """Read the persisted global counters without invoking a provider."""
+    request_id = str(uuid.uuid4())
+    response.headers["X-Request-ID"] = request_id
+    response.headers["Cache-Control"] = "no-store"
+    return {
+        **store(request).budget_snapshot(settings.budget_limits()),
+        "request_id": request_id,
+    }

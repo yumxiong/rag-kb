@@ -12,6 +12,7 @@ from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 
+from app.core.anonymous_session import SessionError
 from app.core.cached_embeddings import CachedEmbeddings
 from app.core.config import settings
 
@@ -73,13 +74,23 @@ class VectorStore:
             model_name = model_config["embedding_model"]
 
             # 使用配置的兼容端点，避免绕过 embedding_api_base_url。
-            embedding_kwargs = {"api_key": api_key, "model": model_name}
+            embedding_kwargs = {
+                "api_key": api_key,
+                "model": model_name,
+                "max_retries": 0,
+                # One query must map to one provider request, without auto-splitting.
+                "check_embedding_ctx_length": False,
+            }
+            embedding_timeout = getattr(settings, "embedding_timeout_seconds", None)
+            if isinstance(embedding_timeout, (int, float)) and not isinstance(
+                embedding_timeout, bool
+            ):
+                embedding_kwargs["timeout"] = embedding_timeout
             if embedding_api_url and embedding_api_url != "https://api.openai.com/v1":
                 embedding_kwargs["base_url"] = embedding_api_url
                 embedding_kwargs["organization"] = ""
             if provider == "qwen":
                 # DashScope 接收文本，不接收 OpenAI tokenizer 的 token IDs。
-                embedding_kwargs["check_embedding_ctx_length"] = False
                 embedding_kwargs["chunk_size"] = 10
             base_embeddings = OpenAIEmbeddings(**embedding_kwargs)
 
@@ -165,6 +176,9 @@ class VectorStore:
 
     def add_documents(self, documents: List[Document]) -> List[str]:
         """添加文档到向量存储"""
+        from app.core.global_budget import require_document_provider_access
+
+        require_document_provider_access()
         self._ensure_initialized()
         try:
             if not documents:
@@ -195,6 +209,8 @@ class VectorStore:
                     f"Added {len(documents)} documents to vector store (batch mode)"
                 )
                 return doc_ids
+            except SessionError:
+                raise
             except Exception as batch_error:
                 logger.warning(f"Batch processing failed: {str(batch_error)}")
                 logger.info("Falling back to individual document processing...")
@@ -209,6 +225,8 @@ class VectorStore:
                         logger.debug(
                             f"Successfully added document {i+1}/{len(documents)}"
                         )
+                    except SessionError:
+                        raise
                     except Exception as individual_error:
                         logger.error(
                             f"Failed to add document {i+1}: {str(individual_error)}"

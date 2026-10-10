@@ -198,6 +198,27 @@ def temp_dir():
 
 
 @pytest.fixture
+def anonymous_test_store(tmp_path, monkeypatch):
+    """Provision an isolated ledger for clients that do not run app lifespan."""
+    from app.api.anonymous_session import SessionRateLimit
+    from app.core.anonymous_session import AnonymousSessionStore, bootstrap
+    from app.main import app
+
+    storage = tmp_path / "volume" / "quotas"
+    reference = tmp_path / "reference" / "store.json"
+    bootstrap(storage, reference, development=True)
+    ledger = AnonymousSessionStore(str(storage), str(reference), development=True)
+    monkeypatch.setattr(app.state, "anonymous_store", ledger, raising=False)
+    monkeypatch.setattr(
+        app.state, "session_rate_limit", SessionRateLimit(), raising=False
+    )
+    try:
+        yield ledger
+    finally:
+        ledger.close()
+
+
+@pytest.fixture
 def mock_settings():
     """模拟设置fixture"""
     with patch("app.core.config.settings") as mock_settings:

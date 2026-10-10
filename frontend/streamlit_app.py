@@ -6,8 +6,6 @@ import json
 import logging
 import os
 import subprocess
-import time
-import uuid
 from datetime import datetime
 
 import requests
@@ -67,7 +65,7 @@ def detect_provider_from_api_key(api_key: str) -> str:
 
 # 尝试导入streamlit-js-eval，如果没有则使用备用方案
 try:
-    from streamlit_js_eval import get_geolocation, streamlit_js_eval
+    from streamlit_js_eval import streamlit_js_eval
 
     JS_EVAL_AVAILABLE = True
 except ImportError:
@@ -80,14 +78,13 @@ from components.chat_interface import ChatInterface
 from components.file_upload import FileUploadComponent
 from utils.settings_loader import SettingsStatus
 from utils.settings_loader import load_user_settings as load_user_settings_shared
-from utils.state_manager import StateManager
 
 # 配置页面
 st.set_page_config(
     page_title="RAG知识库",
     page_icon="📚",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 
@@ -252,27 +249,6 @@ BACKEND_URL_CLIENT = os.getenv(
 # 如需恢复前端实时更新，请在后续改造中为浏览器请求加入安全鉴权机制。
 
 
-def init_websocket_connection(client_id: str):
-    """使用JS注入WebSocket连接"""
-    ws_url = f"{BACKEND_URL_CLIENT.replace('http', 'ws')}/ws/{client_id}"
-
-    js_code = f"""
-    <script>
-    (function() {{
-        if (!window.ragWs) {{
-            console.log('Attempting to connect WebSocket to {ws_url}');
-            const ws = new WebSocket('{ws_url}');
-            ws.onopen = () => console.log('WebSocket connection established.');
-            ws.onclose = () => console.log('WebSocket connection closed.');
-            ws.onerror = (error) => console.error('WebSocket error:', error);
-            window.ragWs = ws;
-        }}
-    }})();
-    </script>
-    """
-    components.html(js_code, height=0, width=0)
-
-
 def build_byok_headers() -> dict:
     """根据当前会话中的 BYOK 设置构造请求头"""
     headers = {}
@@ -280,6 +256,9 @@ def build_byok_headers() -> dict:
     provider = st.session_state.get("byok_provider", "").strip()
     base_url = st.session_state.get("byok_base_url", "").strip()
     model = st.session_state.get("byok_model", "").strip()
+
+    if not api_key:
+        return headers
 
     if api_key:
         headers["LLM-Api-Key"] = api_key
@@ -429,65 +408,49 @@ def clear_user_settings():
 def display_quota_info():
     """以进度条形式展示当日体验额度。"""
     try:
+        from utils.anonymous_session import (
+            ensure_identity,
+            identity_headers,
+            recover_identity,
+        )
+
+        if st.session_state.get("anonymous_error"):
+            st.caption(st.session_state["anonymous_error"])
+            if st.button("重新连接", key="anonymous_reconnect"):
+                ensure_identity(st.session_state, BACKEND_URL_INTERNAL, reconnect=True)
+                st.rerun()
+            return
+        anonymous_headers = identity_headers(st.session_state, BACKEND_URL_INTERNAL)
         if st.session_state.get("settings_status") == SettingsStatus.RESTORING.value:
             st.caption("正在从浏览器恢复设置…")
             return
 
-        if st.session_state.get("byok_api_key"):
-            st.markdown(
-                """
-                <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:10px 12px;">
-                  <div style="font-size:13px;color:#065f46;font-weight:600;">🔑 已接入自定义 API Key</div>
-                  <div style="font-size:12px;color:#047857;margin-top:2px;">不受试用配额限制</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-            return
-
         response = requests.get(
             f"{BACKEND_URL_INTERNAL}/api/qa/quota",
-            headers=build_byok_headers(),
+            headers={**build_byok_headers(), **anonymous_headers},
             timeout=5,
         )
 
         if response.status_code != 200:
-            st.caption("无法获取配额信息")
-            return
+            if recover_identity(st.session_state, BACKEND_URL_INTERNAL, response):
+                response = requests.get(
+                    f"{BACKEND_URL_INTERNAL}/api/qa/quota",
+                    headers={
+                        **build_byok_headers(),
+                        **identity_headers(st.session_state, BACKEND_URL_INTERNAL),
+                    },
+                    timeout=5,
+                )
+            if response.status_code != 200:
+                st.caption("无法获取配额信息")
+                return
 
-        quota_info = response.json()
+        from utils.quota_display import render_quota_info
 
-        if not quota_info.get("quota_enabled", True):
-            st.caption("当前未启用配额限制")
-            return
+        render_quota_info(response.json(), st)
 
-        used = int(quota_info.get("used_count", 0) or 0)
-        limit_raw = quota_info.get("daily_limit", 0)
-        try:
-            limit = int(limit_raw)
-        except (TypeError, ValueError):
-            limit = 0
-        remaining = max(limit - used, 0)
-        ratio = (used / limit) if limit > 0 else 0.0
-
-        st.markdown(
-            f"""
-            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;">
-              <div style="display:flex;justify-content:space-between;align-items:baseline;">
-                <span style="font-size:13px;color:#475569;font-weight:600;">🎁 今日免费体验额度</span>
-                <span style="font-size:12px;color:#64748b;">{used} / {limit}</span>
-              </div>
-              <div style="margin-top:8px;height:6px;background:#e2e8f0;border-radius:999px;overflow:hidden;">
-                <div style="width:{min(ratio*100, 100):.1f}%;height:100%;background:linear-gradient(90deg,#6366f1,#8b5cf6);"></div>
-              </div>
-              <div style="margin-top:8px;font-size:12px;color:#64748b;">剩余 <b style="color:#6366f1;">{remaining}</b> 次 · 超额可在「⚙️ 高级」中接入自己的 Key</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    except Exception as e:
-        st.caption(f"配额信息获取错误: {str(e)}")
+    except Exception:
+        st.caption("暂时无法获取配额信息，请稍后重新连接。")
 
 
 def fetch_public_library() -> dict:
@@ -582,7 +545,7 @@ def render_hero():
             📚 知问 · 智能文档问答
           </h1>
           <div style="color:#64748b; font-size: 0.95rem; margin-bottom: 0.75rem;">
-            上传文档 · 精准检索 · AI 答疑 —— 一个轻量的 RAG 知识库 Demo
+            无需登录即可提问 · 检索公开演示资料 · 查看原文引用
           </div>
         </div>
         """,
@@ -595,13 +558,13 @@ def render_about_expander():
     with st.expander("ℹ️ 关于这个项目（点击展开）", expanded=False):
         st.markdown(
             """
-            **知问** 是一个面向个人知识库场景的 RAG 应用 Demo，支持上传 PDF / Word / Markdown 等文档，
+            **知问** 是一个 RAG 应用 Demo，支持由管理员上传 PDF / Word / Markdown 等文档，
             通过向量检索 + 大模型生成提供带出处的智能问答。
 
             **技术栈**：FastAPI · Streamlit · ChromaDB · OpenAI-compatible LLM · Docker
 
             **当前体验模式**：管理员（即作者）预置文档，访客无需登录即可直接提问。
-            如果你想突破免费配额，可在侧边栏「⚙️ 高级」中填写自己的 API Key。
+            回答基于检索到的文档生成；资料未提供的信息，应明确说明无法确认。
 
             > 这是一个持续迭代中的求职作品，欢迎交流反馈。
             """
@@ -660,7 +623,9 @@ def render_kb_preview(library: dict):
 def render_byok_advanced():
     """高级设置：自定义 API Key（默认折叠）。"""
     with st.expander("⚙️ 高级 · 使用自己的 API Key", expanded=False):
-        st.caption("配置将仅保存在你的浏览器本地，不会上传到服务器。")
+        st.caption(
+            "配置可保存在浏览器本地；提问时 API Key 会经本站后端发送给所选模型服务。"
+        )
         with st.form("byok_form"):
             api_key = st.text_input(
                 "API Key",
@@ -693,7 +658,7 @@ def render_byok_advanced():
             model = st.text_input(
                 "模型（可选）",
                 value=st.session_state.byok_model,
-                placeholder="gpt-4o-mini / deepseek-chat / glm-4",
+                placeholder="gpt-4o-mini / deepseek-flash / glm-4",
             )
 
             col1, col2, col3 = st.columns([1, 1, 1])
@@ -725,7 +690,7 @@ def render_byok_advanced():
                 st.session_state.byok_provider = detected
                 if detected == "deepseek":
                     st.session_state.byok_base_url = "https://api.deepseek.com"
-                    st.session_state.byok_model = "deepseek-chat"
+                    st.session_state.byok_model = "deepseek-flash"
                 elif detected == "zhipu":
                     st.session_state.byok_base_url = (
                         "https://open.bigmodel.cn/api/paas/v4"
@@ -791,12 +756,6 @@ def main():
     # 添加右上角浮动管理员按钮
     # add_floating_admin_button()
 
-    # --- WebSocket & Client ID Management ---
-    if "client_id" not in st.session_state:
-        st.session_state.client_id = str(uuid.uuid4())
-        with st.container():
-            init_websocket_connection(st.session_state.client_id)
-
     # 加载用户设置
     load_user_settings()
 
@@ -812,7 +771,6 @@ def main():
 
     # 提前获取一次公开知识库目录（供 hero 与 chat 共用）
     library = fetch_public_library()
-    doc_count = library.get("total", 0)
     st.session_state["_public_library"] = library  # ChatInterface 可读取
 
     # ===== 侧边栏 =====
@@ -881,6 +839,12 @@ def main():
 
     # Hero 区
     render_hero()
+
+    st.info(
+        "本演示使用 9 份 AtlasDesk 虚构产品文档，覆盖产品套餐、权限、文档接入、"
+        "检索、API、配额、安全、排障与版本说明。资料中的套餐、配额和产品能力"
+        "仅用于演示，不代表本站实际功能或服务承诺。知识库由管理员维护。"
+    )
 
     # 关于折叠卡
     render_about_expander()

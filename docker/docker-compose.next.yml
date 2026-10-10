@@ -1,0 +1,29 @@
+# Add after the base and reviewed production overlay; never run this alone.
+services:
+  next:
+    build:
+      context: ../v0.app-rag
+      dockerfile: Dockerfile
+      args:
+        RAG_BACKEND_ORIGIN: http://backend:8000
+    expose:
+      - "3000"
+    networks:
+      - rag_network
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.28-alpine
+    depends_on:
+      next:
+        condition: service_healthy
+    volumes:
+      - type: bind
+        source: ./nginx/conf.d/next.conf
+        target: /etc/nginx/conf.d/next.conf
+        read_only: true
+        bind:
+          create_host_path: false
+
+networks:
+  rag_network:

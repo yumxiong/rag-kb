@@ -8,12 +8,18 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 
 from fastapi import FastAPI, HTTPException
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.anonymous_session import SessionRateLimit
+from app.api.anonymous_session import router as anonymous_router
+from app.api.anonymous_session import session_error_handler
 from app.api.auth import router as auth_router
 from app.api.cost_optimization import router as cost_router
 from app.api.documents import router as documents_router
 from app.api.qa import router as qa_router
+from app.core.anonymous_session import AnonymousSessionStore, SessionError
 from app.core.concurrency import ConcurrencyLimitMiddleware
 from app.core.config import settings
 from app.core.rate_limiter import limiter
@@ -34,7 +40,27 @@ async def lifespan(app: FastAPI):
     logger.info(f"Upload directory: {settings.upload_dir}")
     logger.info(f"ChromaDB path: {settings.chroma_db_path}")
 
-    yield
+    if (
+        not settings.anonymous_storage_development
+        and not settings.anonymous_cookie_secure
+    ):
+        raise RuntimeError("Production anonymous cookies require Secure")
+    settings.budget_limits()
+    app.state.anonymous_store = AnonymousSessionStore(
+        settings.quota_storage_path,
+        settings.anonymous_store_reference,
+        development=settings.anonymous_storage_development,
+        mount_path=settings.anonymous_mount_path,
+        mount_source=settings.anonymous_mount_source,
+    )
+    app.state.session_rate_limit = SessionRateLimit()
+    try:
+        yield
+    finally:
+        from app.core.concurrency import shutdown_qa_executor
+
+        shutdown_qa_executor(wait=True)
+        app.state.anonymous_store.close()
 
     # 关闭时清理
     logger.info("Shutting down RAG Knowledge Base API...")
@@ -52,6 +78,25 @@ app = FastAPI(
 )
 
 limiter.app = app
+app.add_exception_handler(SessionError, session_error_handler)
+
+
+@app.exception_handler(RequestValidationError)
+async def contract_validation_error_handler(request, error):
+    """Return a redacted input error for the anonymous budget contract."""
+    if request.url.path in {
+        "/api/session/anonymous",
+        "/api/qa/ask",
+        "/api/qa/quota",
+        "/api/qa/quota/reset",
+        "/api/qa/quota/stats",
+        "/api/qa/budget",
+    }:
+        return await session_error_handler(
+            request, SessionError("invalid_request", 400)
+        )
+    return await request_validation_exception_handler(request, error)
+
 
 # 并发保护（注意：中间件后注册的先执行，所以并发限制放在 CORS 之后注册）
 app.add_middleware(
@@ -65,6 +110,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=settings.get_cors_methods(),  # 限制HTTP方法
     allow_headers=settings.get_cors_headers(),  # 限制请求头
+    expose_headers=["X-Request-ID", "Retry-After"],
 )
 
 # 注册路由
@@ -73,6 +119,7 @@ app.include_router(qa_router, prefix="/api/qa", tags=["qa"])
 # cost_router 自身不再携带 /api/cost 前缀，统一在主应用中挂载
 app.include_router(cost_router, prefix="/api/cost", tags=["cost"])
 app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
+app.include_router(anonymous_router, prefix="/api/session", tags=["session"])
 
 
 @app.get("/")
@@ -95,6 +142,9 @@ async def health_check():
             "upload_dir": os.path.exists(settings.upload_dir),
             "chroma_db_path": os.path.exists(settings.chroma_db_path),
         }
+        ledger = getattr(app.state, "anonymous_store", None)
+        if ledger is not None:
+            checks["anonymous_store"] = ledger.healthy
 
         # 检查是否所有项都正常
         all_healthy = all(checks.values())

@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 import jwt
+import pytest
 from fastapi.testclient import TestClient
 from langchain_core.documents import Document
 
@@ -15,6 +16,18 @@ from app.main import app
 from app.models.schemas import SourceDocument
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def connect_anonymous_client(anonymous_test_store, monkeypatch):
+    monkeypatch.setattr(settings, "anonymous_storage_development", True)
+    monkeypatch.setattr(settings, "enable_document_maintenance", True)
+    monkeypatch.setattr(settings, "enable_quota_limit", True)
+    result = client.post("/api/session/anonymous", json={"transport": "header"})
+    assert result.status_code == 201
+    client.headers["X-Anonymous-Token"] = result.json()["token"]
+    yield
+    client.headers.pop("X-Anonymous-Token", None)
 
 
 def _admin_headers() -> dict:
@@ -377,46 +390,38 @@ class TestQAAPI:
         request_data = {"question": "测试问题"}
         response = client.post("/api/qa/ask", json=request_data)
 
-        assert response.status_code == 200
-        data = response.json()
-        assert "知识库中暂时没有文档" in data["answer"]
-        assert len(data["sources"]) == 0
+        assert response.status_code == 503
+        assert response.json()["detail"]["code"] == "knowledge_base_unavailable"
 
     def test_ask_empty_question(self):
         """测试空问题"""
         request_data = {"question": "  "}
         response = client.post("/api/qa/ask", json=request_data)
 
-        assert response.status_code == 422
-        detail = response.json()["detail"]
-        assert any("question" in item["loc"] for item in detail)
+        assert response.status_code == 400
+        assert response.json()["detail"]["code"] == "invalid_request"
 
     def test_ask_question_too_long(self):
         """测试问题过长"""
         long_question = "a" * 2001
         request_data = {"question": long_question}
         response = client.post("/api/qa/ask", json=request_data)
-        assert response.status_code == 422
-        errors = response.json()["detail"]
-        question_error = next(item for item in errors if "question" in item["loc"])
-        assert question_error["type"] == "string_too_long"
-        assert question_error["ctx"]["max_length"] == 2000
+        assert response.status_code == 400
+        assert response.json()["detail"]["code"] == "invalid_request"
 
     def test_ask_question_max_sources_too_small(self):
         request_data = {"question": "测试问题", "max_sources": 0}
         response = client.post("/api/qa/ask", json=request_data)
 
-        assert response.status_code == 422
-        data = response.json()
-        assert any("max_sources" in str(item.get("loc", "")) for item in data["detail"])
+        assert response.status_code == 400
+        assert response.json()["detail"]["code"] == "invalid_request"
 
     def test_ask_question_max_sources_too_large(self):
         request_data = {"question": "测试问题", "max_sources": 6}
         response = client.post("/api/qa/ask", json=request_data)
 
-        assert response.status_code == 422
-        data = response.json()
-        assert any("max_sources" in str(item.get("loc", "")) for item in data["detail"])
+        assert response.status_code == 400
+        assert response.json()["detail"]["code"] == "invalid_request"
 
     def test_search_documents_max_sources_too_large(self):
         request_data = {"question": "测试查询", "max_sources": 6}
@@ -495,12 +500,15 @@ class TestQAAPI:
         response = client.get("/api/qa/suggestions")
         assert response.status_code == 200
         data = response.json()
-        assert "请先上传一些文档" in data["suggestions"]
+        assert data == {"suggestions": [], "document_count": 0}
 
     @patch("app.api.qa.vector_store")
     def test_get_suggestions_with_documents(self, mock_vector_store):
         """测试获取问题建议 - 有文档"""
         mock_vector_store.get_collection_info.return_value = {"document_count": 5}
+        mock_vector_store.list_documents.return_value = [
+            {"filename": str(i)} for i in range(5)
+        ]
 
         response = client.get("/api/qa/suggestions")
         assert response.status_code == 200
@@ -566,6 +574,7 @@ class TestQAEngineRetrievalDecoupling:
 
     @staticmethod
     def _build_engine(vector_store: MagicMock, source_docs: list[Document]) -> QAEngine:
+        vector_store.as_retriever.return_value.invoke.return_value = source_docs
         with patch.object(QAEngine, "_initialize_llm", return_value=None), patch.object(
             QAEngine, "_build_qa_chain", return_value=MagicMock()
         ):
@@ -591,17 +600,17 @@ class TestQAEngineRetrievalDecoupling:
         engine = self._build_engine(vector_store, docs)
 
         with patch(
-            "app.core.qa_engine.cache_manager.get_context_hash", return_value="ctx"
+            "app.core.qa_engine.question_context_hash", return_value="ctx"
         ), patch(
             "app.core.qa_engine.cache_manager.get_qa_cache", return_value=None
         ), patch(
             "app.core.qa_engine.cache_manager.set_qa_cache"
         ):
             response_one = engine.ask("测试问题", max_sources=1)
-            first_call = vector_store.as_retriever.call_args
+            first_call = vector_store.as_retriever.call_args_list[0]
             vector_store.as_retriever.reset_mock()
             response_two = engine.ask("测试问题", max_sources=5)
-            second_call = vector_store.as_retriever.call_args
+            second_call = vector_store.as_retriever.call_args_list[0]
 
         assert len(response_one.sources) == 1
         assert len(response_two.sources) == 4
@@ -628,7 +637,7 @@ class TestQAEngineRetrievalDecoupling:
         engine = self._build_engine(vector_store, restricted_docs)
 
         with patch(
-            "app.core.qa_engine.cache_manager.get_context_hash", return_value="ctx"
+            "app.core.qa_engine.question_context_hash", return_value="ctx"
         ), patch(
             "app.core.qa_engine.cache_manager.get_qa_cache", return_value=None
         ), patch(
@@ -661,7 +670,7 @@ class TestQAEngineRetrievalDecoupling:
         engine = self._build_engine(vector_store, docs)
 
         with patch(
-            "app.core.qa_engine.cache_manager.get_context_hash", return_value="ctx"
+            "app.core.qa_engine.question_context_hash", return_value="ctx"
         ), patch(
             "app.core.qa_engine.cache_manager.get_qa_cache", return_value=None
         ), patch(
@@ -682,7 +691,7 @@ class TestQAEngineRetrievalDecoupling:
         engine = self._build_engine(vector_store, docs)
 
         with patch(
-            "app.core.qa_engine.cache_manager.get_context_hash", return_value="ctx"
+            "app.core.qa_engine.question_context_hash", return_value="ctx"
         ), patch(
             "app.core.qa_engine.cache_manager.get_qa_cache",
             return_value={"answer": "缓存答案", "sources": cached_sources},
@@ -693,7 +702,8 @@ class TestQAEngineRetrievalDecoupling:
 
         assert response.from_cache is True
         assert len(response.sources) == 2
-        vector_store.as_retriever.assert_not_called()
+        # Resolve evidence before cache lookup so the key covers the actual context.
+        vector_store.as_retriever.assert_called_once()
         mock_set_cache.assert_not_called()
 
 

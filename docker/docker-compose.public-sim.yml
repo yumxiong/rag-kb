@@ -9,6 +9,7 @@ services:
     environment:
       # Override the base compose API_KEY expansion and force file-based secrets.
       API_KEY: ""
+      TRUSTED_PROXY_IPS: 172.30.0.10
       
     volumes:
       - ../secrets:/run/secrets:ro
@@ -41,7 +42,8 @@ services:
       - frontend
     restart: unless-stopped
     networks:
-      - rag_network
+      rag_network:
+        ipv4_address: 172.30.0.10
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://backend:8000/health"]
       interval: 30s

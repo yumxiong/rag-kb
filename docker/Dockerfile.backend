@@ -66,4 +66,6 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:8000/health || exit 1
 
 # 启动命令（增加超时配置）
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--timeout-keep-alive", "300", "--timeout-graceful-shutdown", "120"]
+# Only the explicitly configured reverse-proxy address may supply forwarded headers.
+# Production Compose sets TRUSTED_PROXY_IPS to the Nginx service address.
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips=\"${TRUSTED_PROXY_IPS:-127.0.0.1}\" --timeout-keep-alive 300 --timeout-graceful-shutdown 120"]

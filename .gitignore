@@ -26,6 +26,7 @@ venv*/
 .env.zhipu
 
 # Data directories
+data/acceptance-step4/
 data/uploads/*
 data/chroma_db/*
 data/job_status/*
@@ -88,12 +89,16 @@ build/
 dist/
 *.egg-info/
 
+# Local synthetic acceptance runtime (contains disposable identity credentials)
+/rag-step5-local-*/
+
 # Docker
 docker/docker-compose.secrets.yml
 docker/docker-compose.production.yml
 docker/docker-compose.certbot.override.yml
 docker/nginx/conf.d/production.conf
 docker/nginx/conf.d/production-init.conf
+docker/nginx/conf.d/next.conf
 # md
 ADMIN_BUTTON_TEST_REPORT.md
 STREAMLIT_VERSION_VERIFICATION.md

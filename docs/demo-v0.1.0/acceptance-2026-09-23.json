@@ -1,0 +1,108 @@
+{
+  "date": "2026-09-23",
+  "scope": "Local real API acceptance; not Docker or external production acceptance",
+  "corpus": "atlasdesk-demo-v1",
+  "documents": 9,
+  "chunks": 32,
+  "embedding_model": "text-embedding-v3",
+  "embedding_dimensions": 1024,
+  "chat_model": "deepseek-flash",
+  "thinking": "disabled",
+  "max_output_tokens": 800,
+  "retrieval": {
+    "nearest_first": 2,
+    "total_chunks": 6,
+    "mmr_fetch_k": 24,
+    "mmr_lambda": 0.3,
+    "visible_sources": 3
+  },
+  "runtime": "uncommitted deployment worktree changes",
+  "questions": [
+    {
+      "id": "demo-01",
+      "question": "AtlasDesk 网页上传的单个文件最大支持多大？",
+      "answer": "根据文档内容，AtlasDesk 通过网页界面上传时，**单个文件大小上限为 40 MB**。超过限制的材料应先整理或拆分后再提交。",
+      "status": 200,
+      "from_cache": false,
+      "seconds": 3.26,
+      "sources": [
+        "atlas-03-document-ingestion.md",
+        "atlas-06-quotas-and-billing.md",
+        "atlas-01-product-and-plans.md"
+      ],
+      "expected_evidence_covered": [
+        true
+      ],
+      "review": "pass; answer facts manually reviewed, boundary question explicitly reports missing quotation"
+    },
+    {
+      "id": "demo-02",
+      "question": "我把同一份材料换个文件名再上传，AtlasDesk 根据什么判断重复？",
+      "answer": "根据文档内容，AtlasDesk 判断重复的依据是：\n\n- **比较规范化文件内容的 SHA-256 摘要**，而不是上传者给出的文件名。\n- 也就是说，**只更换标题或重新保存文件，不应被当作内容已经发生实质变化的证明**。\n- 文档还明确提到，对于疑似重复材料，应核对已有内容，而不是不断给文件换名字。",
+      "status": 200,
+      "from_cache": false,
+      "seconds": 1.16,
+      "sources": [
+        "atlas-08-troubleshooting-and-escalation.md",
+        "atlas-05-api-and-jobs.md",
+        "atlas-03-document-ingestion.md"
+      ],
+      "expected_evidence_covered": [
+        true
+      ],
+      "review": "pass; answer facts manually reviewed, boundary question explicitly reports missing quotation"
+    },
+    {
+      "id": "demo-03",
+      "question": "AtlasDesk 使用自带模型后，是否就不受索引额度限制了？",
+      "answer": "根据文档内容，**不是**。使用自带模型（BYOK）后，仍然受索引额度限制。\n\n具体说明如下：\n\n1. **BYOK 的作用范围**：BYOK 移除的是 AtlasDesk 的生成 token 费用，影响的是生成式问答中模型用量的账务范围。\n\n2. **不免除索引页配额**：文档明确指出，BYOK“不会免除索引页配额”，也不会让文档接入与检索前的材料准备脱离原有规则。\n\n3. **应分开核对**：评估成本时，应把生成环节和索引环节分开核对，避免把一种费用变化解释成全部用量都不再受约束。\n\n因此，自带模型只改变生成环节的账务，索引页配额仍按原规则执行（Standard 5,000 页、Enterprise 100,000 页，每月首日 00:00 UTC 重置）。",
+      "status": 200,
+      "from_cache": false,
+      "seconds": 1.12,
+      "sources": [
+        "atlas-06-quotas-and-billing.md",
+        "atlas-06-quotas-and-billing.md",
+        "atlas-02-identity-and-access.md"
+      ],
+      "expected_evidence_covered": [
+        true
+      ],
+      "review": "pass; answer facts manually reviewed, boundary question explicitly reports missing quotation"
+    },
+    {
+      "id": "demo-04",
+      "question": "AtlasDesk 网页上传报 ING-413 是什么意思？单文件上限是多少？",
+      "answer": "根据文档内容：\n\n- **ING-413 的含义**：文件超过单文件上传限制。\n- **单文件上限**：通过网页界面上传时，单个文件大小上限为 **40 MB**。\n\n处理方向：应先整理或拆分文件，再按上传路径的大小规则重新检查后提交。拆分时应保持必要上下文，避免把标题与对应步骤分开。",
+      "status": 200,
+      "from_cache": false,
+      "seconds": 1.12,
+      "sources": [
+        "atlas-03-document-ingestion.md",
+        "atlas-08-troubleshooting-and-escalation.md",
+        "atlas-06-quotas-and-billing.md"
+      ],
+      "expected_evidence_covered": [
+        true,
+        true
+      ],
+      "review": "pass; answer facts manually reviewed, boundary question explicitly reports missing quotation"
+    },
+    {
+      "id": "demo-05",
+      "question": "AtlasDesk 的私有化部署报价是多少？",
+      "answer": "根据提供的文档内容，**没有关于 AtlasDesk 私有化部署报价的信息**。\n\n文档中与套餐相关的内容仅包括：\n\n- AtlasDesk 提供 **Standard** 和 **Enterprise** 两种套餐。\n- 套餐比较中提到的差异是：Standard 最多 3 个工作区，Enterprise 最多 25 个工作区。\n- 只有 Enterprise 可以启用 **BYOK**（用于生成式问答的自带模型配置）。\n\n文档中没有提及私有化部署，也没有提供任何报价、价格或费用信息。因此无法根据现有文档回答该问题。",
+      "status": 200,
+      "from_cache": false,
+      "seconds": 1.25,
+      "sources": [
+        "atlas-01-product-and-plans.md",
+        "atlas-01-product-and-plans.md",
+        "atlas-05-api-and-jobs.md"
+      ],
+      "expected_evidence_covered": [],
+      "review": "pass; answer facts manually reviewed, boundary question explicitly reports missing quotation"
+    }
+  ],
+  "admin": "22 live management routes returned 401 anonymously; temporary admin login, list, Markdown async upload, completion, deletion passed",
+  "browser": "Tabbit desktop 1440x1000 and mobile 390x844; real example answer and complete evidence; anonymous Admin shows login form"
+}

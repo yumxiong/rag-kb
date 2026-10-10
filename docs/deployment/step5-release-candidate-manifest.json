@@ -1,0 +1,118 @@
+{
+  "candidate": "step5-deploy-RC1",
+  "base_commit": "738da665b634278fd92d7ab04ef2f2aa1f05a16c",
+  "files": [
+    {
+      "path": ".dockerignore",
+      "status": "M",
+      "sha256": "2fada4a28e9c6d260380d5aeea804c4907063b99cd784f6975e293b8b822f490",
+      "git_blob_oid": "9fe5d35ac4ea305c82252f69929a9895adc4139c"
+    },
+    {
+      "path": ".gitignore",
+      "status": "M",
+      "sha256": "97c375d30d61be4d3471113bb29681c00a73885bd758664795ba1583a44b0450",
+      "git_blob_oid": "841b5a876c1553ebcb42c1ff6ab4f6549aea9d65"
+    },
+    {
+      "path": "docker/docker-compose.next-real.yml",
+      "status": "A",
+      "sha256": "ad0da2fd095a84d37a4a5cc07a639ec8be53c3fd13f015d8df277d3f6cd70219",
+      "git_blob_oid": "384e677fc054bcd6bc0522a551498185db566e6b"
+    },
+    {
+      "path": "docker/docker-compose.next-smoke.yml",
+      "status": "A",
+      "sha256": "84ae0176fd9be30ce943f9f62edeba4fb1a07e2a5bda8a9eca435840a2e1dc20",
+      "git_blob_oid": "1230698672d45d911da46638c8c6c7a967fae944"
+    },
+    {
+      "path": "docker/docker-compose.next.yml",
+      "status": "A",
+      "sha256": "e550e52f656ea57047e666c6ccf32f9c0ba1354e50392c1bb1377ad0938ce8b6",
+      "git_blob_oid": "3265eb6db6619d52a99fb0319ea938eed24e9d7f"
+    },
+    {
+      "path": "docker/nginx/conf.d/next.conf.template",
+      "status": "A",
+      "sha256": "c3d66b984902c09d042baa97d7b7bf9ee8703113705b42d62a310fa5241bc5a2",
+      "git_blob_oid": "6c29895627ee3a85068bec6fe10cfa7eb42c2eaa"
+    },
+    {
+      "path": "docs/deployment/step5-deploy-environment-acceptance.md",
+      "status": "A",
+      "sha256": "a218f5a58d7d6786bcf67e50190328deb56dd4b04372d73d55acff71f1996bc4",
+      "git_blob_oid": "97aa04df6f869e5e7781288f753ad82a7e9badea"
+    },
+    {
+      "path": "docs/deployment/step5-next-deployment.md",
+      "status": "A",
+      "sha256": "b2f8e9e12993eac179f7cbda8f5d8daa2c5260d0b6a9c02ba6953a06631e4dd7",
+      "git_blob_oid": "aa9fcea6a98e60c8d28f790b4c194c2e6c913bf7"
+    },
+    {
+      "path": "scripts/acceptance/step5/gateway_fixture.mjs",
+      "status": "A",
+      "sha256": "67859dbdd9706c32bacc3adda20a279c41ddea04b61120614d68b70b73768dea",
+      "git_blob_oid": "6c076c8c3e9518981a3b5d78d858cf859c193bd3"
+    },
+    {
+      "path": "scripts/acceptance/step5/next_gateway_check.py",
+      "status": "A",
+      "sha256": "25df029ea8fb9f1d2faec4caa724a281e4533d43729d45819cdd655235ddc75d",
+      "git_blob_oid": "434bcd4231eaf910f6169ad278c26624b1112696"
+    },
+    {
+      "path": "scripts/acceptance/step5/next_standalone_check.mjs",
+      "status": "A",
+      "sha256": "d645fbea487a3907ae00a30be1a831f11c6a1c69867108ba117e8206bd102dcb",
+      "git_blob_oid": "7d5667ba428d2a7ba821ca53a13beb6963d8ee06"
+    },
+    {
+      "path": "scripts/acceptance/step5/real_gateway_check.py",
+      "status": "A",
+      "sha256": "480313efbf3307e7e5579a86ef6e8e3bc18efc19002123f4b4b3c8d42b595910",
+      "git_blob_oid": "11d731c1df7b8241ab902367f8eba71842a23f84"
+    },
+    {
+      "path": "scripts/acceptance/step5/real_gateway_fixture.py",
+      "status": "A",
+      "sha256": "25c490d40af0e76a17007350800489ec981558a07b0b773a3d918eef26afb436",
+      "git_blob_oid": "882e449e5485b08609c4acd207bd80e2c131a44e"
+    },
+    {
+      "path": "v0.app-rag/.dockerignore",
+      "status": "A",
+      "sha256": "ed4e1f5277ec69aa1b1248c679cb9a2a317826cc3614d9930c5da4a6264dff41",
+      "git_blob_oid": "b15cf612e3d605cc7c32b6c7b601891399e6f7ca"
+    },
+    {
+      "path": "v0.app-rag/Dockerfile",
+      "status": "A",
+      "sha256": "5c93fab29c17e9c42e8633f67e836992cff84cc7a5d939aac09ad2f8d81cc7a7",
+      "git_blob_oid": "4259147659412329e550ccd6e674b6897e8cf1ee"
+    },
+    {
+      "path": "v0.app-rag/lib/api.ts",
+      "status": "M",
+      "sha256": "f0e37e0bc9a93df58e2813702c8c9f4ffb5ecd09addc5b7860d39f97e3db63bd",
+      "git_blob_oid": "fbc108d852669b1c25e0c6ed0ae352a0bd029a01"
+    },
+    {
+      "path": "v0.app-rag/next.config.mjs",
+      "status": "M",
+      "sha256": "84a1ce57157fb8545dd687b1c1f349020ab6c1721abee9a54639911cd5fbcb74",
+      "git_blob_oid": "0e6e7950b9b921738693d3e4a79a381aa665a35a"
+    },
+    {
+      "path": "v0.app-rag/tests/api.test.ts",
+      "status": "M",
+      "sha256": "21165d7d2ca59592fa7afbb611539fd02f77c2c991dddaf5a2a8622d001d9069",
+      "git_blob_oid": "bf281d0faa93a53ee254e9d2bb6cd5780f30c9fd"
+    }
+  ],
+  "review_metadata": [
+    "docs/deployment/step5-release-candidate.md",
+    "docs/deployment/step5-release-candidate-manifest.json"
+  ]
+}

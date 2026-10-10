@@ -1,13 +1,14 @@
 import os
+import re
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import jwt
 import requests
 import streamlit as st
 
 # BACKEND = os.getenv("BACKEND_URL", "http://localhost:8000")
-BACKEND = os.getenv("BACKEND_URL")
+BACKEND = os.getenv("BACKEND_URL", "http://localhost:8000")
 st.set_page_config(page_title="管理员控制台", page_icon="🔐", layout="wide")
 
 
@@ -75,16 +76,28 @@ def admin_login_form():
                 st.error(f"❌ 登录失败: {str(e)}")
 
 
-def reset_quota():
-    """重置用户配额"""
+def reset_quota(quota_ref: str, reason: str):
+    """按管理员明确选择的身份摘要重置当日个人额度。"""
     tok = st.session_state.get("admin_jwt")
     if not tok:
         st.warning("⚠️ 请先登录管理员")
         return
 
+    if (
+        not re.fullmatch(r"[0-9a-f]{64}", quota_ref)
+        or not 1 <= len(reason.strip()) <= 200
+    ):
+        st.warning("请填写统计中的 64 位小写 quota_ref 和 1–200 字符的原因。")
+        return
+
     try:
         h = {"Authorization": f"Bearer {tok}"}
-        r = requests.post(f"{BACKEND}/api/qa/quota/reset", headers=h, timeout=10)
+        r = requests.post(
+            f"{BACKEND}/api/qa/quota/reset",
+            headers=h,
+            json={"quota_ref": quota_ref, "reason": reason.strip()},
+            timeout=10,
+        )
 
         if r.status_code == 200:
             result = r.json()
@@ -92,14 +105,14 @@ def reset_quota():
                 st.success(f"✅ {result.get('message', '配额重置成功')}")
             else:
                 st.warning(f"⚠️ {result.get('message', '配额重置失败')}")
-        elif r.status_code == 403:
+        elif r.status_code in (401, 403):
             st.error("❌ 权限不足，令牌可能已过期，请重新登录")
             del st.session_state["admin_jwt"]
             st.rerun()
         else:
-            st.error(f"❌ 操作失败 (HTTP {r.status_code}): {r.text}")
-    except Exception as e:
-        st.error(f"❌ 请求失败: {str(e)}")
+            st.error(f"❌ 操作失败 (HTTP {r.status_code})，请检查目标摘要和服务状态。")
+    except Exception:
+        st.error("❌ 重置请求未确认成功，请刷新统计后核对；不会自动重试。")
 
 
 def get_quota_stats():
@@ -275,9 +288,13 @@ def admin_panel():
 
         with col_a:
             st.markdown("#### 重置用户配额")
-            st.info("重置当前用户的查询配额（基于IP和User-Agent）")
+            st.info(
+                "从额度统计复制目标 quota_ref；仅清零该身份当日个人次数，不重置全站预算或身份期限。"
+            )
+            quota_ref = st.text_input("目标 quota_ref", max_chars=64)
+            reason = st.text_input("重置原因", max_chars=200)
             if st.button("🔄 重置配额", type="primary", use_container_width=True):
-                reset_quota()
+                reset_quota(quota_ref, reason)
 
         with col_b:
             st.markdown("#### 配额统计")

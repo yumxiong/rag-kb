@@ -7,6 +7,13 @@ from unittest.mock import Mock, patch
 import pytest
 
 from app.core.cached_embeddings import CachedEmbeddings
+from app.core.global_budget import offline_provider_access
+
+
+@pytest.fixture(autouse=True)
+def offline_scope():
+    with offline_provider_access(reason="isolated embedding unit tests"):
+        yield
 
 
 class TestCachedEmbeddings:

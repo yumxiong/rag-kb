@@ -1,0 +1,26 @@
+# Allow only build inputs. Never send local credentials, caches or test data.
+**
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!next.config.mjs
+!next-env.d.ts
+!tsconfig.json
+!postcss.config.mjs
+!app/
+!app/**
+!components/
+!components/**
+!hooks/
+!hooks/**
+!lib/
+!lib/**
+!styles/
+!styles/**
+!public/
+!public/**
+**/.env*
+**/*.pem
+**/*.key
+**/node_modules
+**/.next

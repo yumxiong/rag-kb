@@ -2,11 +2,18 @@
 聊天界面组件
 """
 
-import time
+from html import escape
 from typing import Optional
 
 import requests
 import streamlit as st
+
+from frontend.utils.anonymous_session import (
+    AnonymousConnectionError,
+    ensure_identity,
+    identity_headers,
+    recover_identity,
+)
 
 MAX_QUESTION_LENGTH = 2000
 DEFAULT_MAX_SOURCES = 3
@@ -35,6 +42,11 @@ class ChatInterface:
     def render(self):
         """渲染聊天界面"""
 
+        try:
+            ensure_identity(st.session_state, self.backend_url)
+        except AnonymousConnectionError:
+            st.caption(st.session_state.get("anonymous_error", "暂时无法连接会话。"))
+
         has_messages = bool(st.session_state.messages)
 
         if not has_messages:
@@ -45,14 +57,31 @@ class ChatInterface:
             self._render_chat_history()
             top_c1, top_c2 = st.columns([5, 1])
             with top_c2:
-                if st.button("🗑️ 清空对话", key="clear_chat", use_container_width=True):
+                if st.button(
+                    "🗑️ 清空对话",
+                    key="clear_chat",
+                    use_container_width=True,
+                    disabled=st.session_state.is_processing,
+                ):
                     st.session_state.messages = []
+                    st.session_state.pop("retry_question", None)
                     if st.session_state.get("reset_scope_on_clear", True):
                         st.session_state.selected_doc_id = None
                     st.rerun()
 
         # 输入区域 + 高级设置
         self._render_input_area()
+        if st.session_state.get("retry_question"):
+            st.caption("请求失败不代表未计次；主动重试会发起一次新的问答。")
+            if st.button(
+                "明确重试上个问题",
+                key="retry_failed_question",
+                disabled=st.session_state.is_processing,
+            ):
+                self._process_question(st.session_state.retry_question)
+        pending_question = st.session_state.pop("pending_question", None)
+        if pending_question is not None:
+            self._execute_question(pending_question)
 
     def _render_chat_history(self):
         """渲染聊天历史"""
@@ -100,7 +129,7 @@ class ChatInterface:
                                     font-size: 12px;
                                     margin-right: 10px;
                                 ">{i}</span>
-                                <strong style="color: #667eea;">{source['document_name']}</strong>
+                                <strong style="color: #667eea;">{escape(source['document_name'])}</strong>
                             </div>
                         </div>
                         """,
@@ -114,7 +143,7 @@ class ChatInterface:
                             else source["content"]
                         )
                         st.markdown(
-                            f"<div style='padding-left: 34px; color: #666; font-size: 0.9em;'>{content_preview}</div>",
+                            f"<div style='padding-left: 34px; color: #666; font-size: 0.9em;'>{escape(content_preview)}</div>",
                             unsafe_allow_html=True,
                         )
 
@@ -138,11 +167,15 @@ class ChatInterface:
                 return data.get("suggestions", []), data.get("document_count", 0)
         except Exception:
             pass
-        return [], 0
+        return [], None
 
     def _render_welcome_and_suggestions(self):
         """空对话状态：欢迎卡片 + 胶囊式示例问题。"""
         suggestions, doc_count = self._fetch_suggestions()
+
+        if doc_count is None:
+            st.warning("暂时无法获取示例问题，请稍后刷新。你也可以直接输入问题。")
+            return
 
         if doc_count == 0:
             # 空知识库：友好引导
@@ -169,11 +202,11 @@ class ChatInterface:
                         border:1px solid #e0e7ff;border-radius:14px;padding:20px 22px;
                         margin:8px 0 16px 0;">
               <div style="font-size:1.1rem;font-weight:600;color:#312e81;margin-bottom:6px;">
-                👋 你好！我是基于 {doc_count} 个文档训练的智能助手
+                👋 从 {doc_count} 份文档中检索信息，为你解答
               </div>
               <div style="font-size:13px;color:#4338ca;line-height:1.6;">
                 左侧栏列出了当前可问答的文档范围。在下方输入框直接提问，或点击下面的建议快速开始。
-                每条回答都会附带文档出处，便于验证。
+                回答下方可查看检索来源；请展开原文核对，资料不足时不应据此推断。
               </div>
             </div>
             """,
@@ -187,12 +220,20 @@ class ChatInterface:
                 unsafe_allow_html=True,
             )
             top = suggestions[:4]
-            cols = st.columns(len(top))
+            cols = st.columns(2)
             for i, suggestion in enumerate(top):
-                with cols[i]:
+                with cols[i % 2]:
                     if st.button(
-                        suggestion, key=f"suggestion_{i}", use_container_width=True
+                        suggestion,
+                        key=f"suggestion_{i}",
+                        use_container_width=True,
+                        disabled=(
+                            st.session_state.is_processing
+                            or not st.session_state.get("anonymous_token")
+                        ),
                     ):
+                        # Demo questions span the corpus, including two-source evidence.
+                        st.session_state.selected_doc_id = None
                         self._process_question(suggestion)
 
     def _fetch_scope_docs(self) -> list:
@@ -227,9 +268,14 @@ class ChatInterface:
 
         # 问题输入（主输入框，最显眼）
         user_question = st.chat_input(
-            "在这里提问，例如：这个项目的技术栈是什么？",
-            disabled=st.session_state.is_processing,
-            max_chars=MAX_QUESTION_LENGTH,
+            "向 AtlasDesk 文档提问…",
+            disabled=(
+                st.session_state.is_processing
+                or not st.session_state.get("anonymous_token")
+            ),
+            # Streamlit counts UTF-16 units; Python validates Unicode code points
+            # before sending an ask. Allow two units for each astral character.
+            max_chars=MAX_QUESTION_LENGTH * 2,
         )
 
         if user_question:
@@ -290,7 +336,7 @@ class ChatInterface:
                 )
                 st.session_state.reset_scope_on_clear = reset_scope
 
-        st.caption(f"问题长度上限：{MAX_QUESTION_LENGTH} 字符")
+        st.caption(f"问题长度上限：{MAX_QUESTION_LENGTH} 字符，超出后请精简再提交。")
 
     def _validate_question(self, question: str) -> Optional[str]:
         """验证问题长度"""
@@ -298,7 +344,7 @@ class ChatInterface:
         if not normalized_question:
             st.warning("⚠️ 请输入有效的问题")
             return None
-        if len(normalized_question) > MAX_QUESTION_LENGTH:
+        if len(question) > MAX_QUESTION_LENGTH:
             st.warning(f"⚠️ 问题长度不能超过{MAX_QUESTION_LENGTH}字符，请精简后重试")
             return None
         return normalized_question
@@ -306,9 +352,20 @@ class ChatInterface:
     def _process_question(self, question: str):
         """处理用户问题"""
 
+        if st.session_state.is_processing:
+            return
         validated_question = self._validate_question(question)
         if validated_question is None:
             return
+        st.session_state.pop("retry_question", None)
+        st.session_state.pending_question = validated_question
+        st.session_state.is_processing = True
+        # Render disabled controls before the synchronous server-side HTTP call.
+        st.rerun()
+
+    def _execute_question(self, validated_question: str):
+        """Execute one queued question after the busy state has been rendered."""
+        question = validated_question
 
         st.session_state.messages.append({"role": "user", "content": question})
 
@@ -354,7 +411,7 @@ class ChatInterface:
                             ]
                         ),
                         headers=self._build_byok_headers(),
-                        timeout=30,
+                        timeout=75,
                     )
 
                     if response.status_code == 200:
@@ -386,8 +443,20 @@ class ChatInterface:
                         self._render_feedback(question, answer)
 
                     else:
-                        error_detail = response.json().get("detail", "未知错误")
+                        recovered = recover_identity(
+                            st.session_state, self.backend_url, response
+                        )
+                        try:
+                            error_detail = response.json().get("detail", "请求失败")
+                            if isinstance(error_detail, dict):
+                                error_detail = error_detail.get(
+                                    "message", "服务暂不可用"
+                                )
+                        except ValueError:
+                            error_detail = f"服务暂时不可用（HTTP {response.status_code}），请稍后重试"
                         error_msg = f"❌ 处理问题时出错: {error_detail}"
+                        if recovered:
+                            error_msg = "会话已重新连接，请再次主动提交问题。"
                         st.error(error_msg)
 
                         st.session_state.messages.append(
@@ -395,14 +464,25 @@ class ChatInterface:
                         )
 
                 except requests.exceptions.Timeout:
-                    timeout_msg = "❌ 请求超时，请稍后重试"
+                    st.session_state.retry_question = validated_question
+                    timeout_msg = "❌ 请求超时，可能已计入今日次数，请稍后主动重试。"
                     st.error(timeout_msg)
                     st.session_state.messages.append(
                         {"role": "assistant", "content": timeout_msg}
                     )
 
-                except Exception as e:
-                    error_msg = f"❌ 发生错误: {str(e)}"
+                except requests.exceptions.RequestException:
+                    st.session_state.retry_question = validated_question
+                    error_msg = (
+                        "❌ 网络连接失败，响应丢失不代表未扣额，请检查网络后主动重试。"
+                    )
+                    st.error(error_msg)
+                    st.session_state.messages.append(
+                        {"role": "assistant", "content": error_msg}
+                    )
+
+                except Exception:
+                    error_msg = "❌ 暂时无法处理回答，请稍后主动提交。"
                     st.error(error_msg)
                     st.session_state.messages.append(
                         {"role": "assistant", "content": error_msg}
@@ -469,12 +549,14 @@ class ChatInterface:
 
     def _build_byok_headers(self) -> dict:
         """根据侧边栏保存的 BYOK 设置构建请求头（仅保存在本地会话）"""
-        headers = {}
+        headers = identity_headers(st.session_state, self.backend_url)
         try:
             api_key = getattr(st.session_state, "byok_api_key", "").strip()
             provider = getattr(st.session_state, "byok_provider", "").strip()
             base_url = getattr(st.session_state, "byok_base_url", "").strip()
             model = getattr(st.session_state, "byok_model", "").strip()
+            if not api_key:
+                return headers
             if api_key:
                 headers["LLM-Api-Key"] = api_key
             if provider:
@@ -494,3 +576,4 @@ class ChatInterface:
     def clear_chat_history(self):
         """清空聊天历史"""
         st.session_state.messages = []
+        st.session_state.pop("retry_question", None)

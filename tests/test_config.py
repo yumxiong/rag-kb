@@ -422,7 +422,7 @@ class TestSettings:
         config = settings.get_model_config()
 
         assert config["provider"] == "deepseek"
-        assert config["chat_model"] == "deepseek-v4-flash"
+        assert config["chat_model"] == "deepseek-flash"
         assert config["api_base_url"] == "https://api.deepseek.com"
         assert config["embedding_api_base_url"] == "https://api.openai.com/v1"
 
@@ -509,7 +509,7 @@ class TestSettings:
             embedding_batch_size=200,
             max_context_length=8000,
             llm_temperature=0.2,
-            llm_max_tokens=1200,
+            llm_max_tokens=600,
             upload_dir=upload_dir,
             chroma_db_path=chroma_dir,
         )
@@ -521,7 +521,7 @@ class TestSettings:
         assert settings.embedding_batch_size == 200
         assert settings.max_context_length == 8000
         assert settings.llm_temperature == 0.2
-        assert settings.llm_max_tokens == 1200
+        assert settings.llm_max_tokens == 600
 
     def test_rag_config_parameters(self, temp_dirs):
         """测试RAG配置参数"""

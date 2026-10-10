@@ -6,17 +6,60 @@ import logging
 import time
 from typing import Any, Dict, List, Optional
 
+import httpx
 from langchain.chains import RetrievalQA
 from langchain_core.documents import Document
-from langchain_core.prompts import PromptTemplate
+from langchain_core.retrievers import BaseRetriever
 from langchain_openai import ChatOpenAI
 
+from app.core.anonymous_session import SessionError
 from app.core.cache_manager import cache_manager
 from app.core.config import settings
+from app.core.deadline import current_deadline
+from app.core.global_budget import (
+    ChatAttemptCallback,
+    in_question_budget,
+    require_query_context,
+)
+from app.core.question_cost import (
+    QA_PROMPT,
+    fit_question_documents,
+    question_context_hash,
+)
 from app.core.vector_store import VectorStore
 from app.models.schemas import QuestionResponse, SourceDocument
 
 logger = logging.getLogger(__name__)
+
+
+class EvidenceRetriever(BaseRetriever):
+    """Keep the two nearest chunks before filling with diverse candidates."""
+
+    nearest: Any
+    diverse: Any
+    k: int
+
+    def _get_relevant_documents(self, query: str, *, run_manager) -> List[Document]:
+        candidates = self.nearest.invoke(query) + self.diverse.invoke(query)
+        seen = set()
+        result = []
+        for doc in candidates:
+            identity = (doc.metadata.get("document_id"), doc.page_content)
+            if identity not in seen:
+                seen.add(identity)
+                result.append(doc)
+            if len(result) >= self.k:
+                break
+        return result
+
+
+class PreparedEvidenceRetriever(BaseRetriever):
+    """Reuse the exact bounded evidence used for the cache key and citations."""
+
+    documents: List[Document]
+
+    def _get_relevant_documents(self, query: str, *, run_manager) -> List[Document]:
+        return self.documents
 
 
 def _format_scored_candidate(doc: Document, score: float) -> str:
@@ -62,9 +105,20 @@ class QAEngine:
             llm_kwargs = {
                 "model": model_config["chat_model"],
                 "api_key": api_key,
-                "temperature": 0.1,
-                "max_tokens": 1000,
+                "temperature": settings.llm_temperature,
+                "max_tokens": settings.llm_max_tokens,
+                "max_retries": 0,
+                "cache": False,
+                "http_client": httpx.Client(follow_redirects=False),
+                "http_async_client": httpx.AsyncClient(follow_redirects=False),
             }
+            chat_timeout = getattr(settings, "chat_timeout_seconds", None)
+            if isinstance(chat_timeout, (int, float)) and not isinstance(
+                chat_timeout, bool
+            ):
+                llm_kwargs["timeout"] = chat_timeout
+            if model_config["provider"] == "deepseek":
+                llm_kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
 
             # 设置自定义API端点（如果指定）
             if (
@@ -90,26 +144,6 @@ class QAEngine:
     def _build_qa_chain(self, retriever=None):
         """构建问答链"""
         try:
-            # 自定义提示模板
-            prompt_template = """你是一个智能助手，请根据以下文档内容回答用户的问题。
-
-文档内容：
-{context}
-
-问题：{question}
-
-请注意：
-1. 请尽量基于提供的文档内容来回答问题
-2. 如果文档中没有相关信息，请明确说明
-3. 回答要准确、简洁、有帮助
-4. 如果涉及多个方面，请分点说明
-
-回答："""
-
-            PROMPT = PromptTemplate(
-                template=prompt_template, input_variables=["context", "question"]
-            )
-
             # 构建检索问答链（支持传入按请求定制的 retriever）
             effective_retriever = retriever or self.vector_store.as_retriever(
                 search_kwargs={"k": settings.max_sources}
@@ -119,7 +153,7 @@ class QAEngine:
                 chain_type="stuff",
                 retriever=effective_retriever,
                 return_source_documents=True,
-                chain_type_kwargs={"prompt": PROMPT},
+                chain_type_kwargs={"prompt": QA_PROMPT},
             )
             # 仅当未传入自定义 retriever 时，保留为默认链
             if retriever is None:
@@ -138,6 +172,10 @@ class QAEngine:
         document_id: Optional[str] = None,
     ) -> QuestionResponse:
         """回答问题（带缓存优化）"""
+        require_query_context()
+        deadline = current_deadline()
+        if deadline is not None:
+            deadline.check()
         start_time = time.time()
 
         try:
@@ -166,6 +204,8 @@ class QAEngine:
                         threshold=settings.relevance_fallback_threshold,
                     )
                 except Exception as _e:
+                    if isinstance(_e, SessionError) or in_question_budget():
+                        raise
                     logger.warning(
                         "Scored search failed under document scope, "
                         f"fallback to vanilla search: {_e}"
@@ -180,6 +220,8 @@ class QAEngine:
                         threshold=settings.relevance_fallback_threshold,
                     )
                 except Exception as _e:
+                    if isinstance(_e, SessionError) or in_question_budget():
+                        raise
                     logger.warning(f"Scored search failed for global scope: {_e}")
                     global_scored = []
 
@@ -236,34 +278,6 @@ class QAEngine:
                 relevant_docs = self.get_relevant_documents(question, global_k, None)
 
             # 基于最终采用的上下文计算hash
-            context_hash = cache_manager.get_context_hash(relevant_docs)
-
-            # 获取模型配置用于缓存key（使用生效的配置，避免与默认配置混淆）
-            model_cfg = self._effective_model_config or settings.get_model_config()
-            base = (model_cfg["api_base_url"] or "https://api.openai.com/v1").rstrip(
-                "/"
-            )
-            model_name = f"{model_cfg['provider']}/{model_cfg['chat_model']}@{base}"
-
-            # 检查QA缓存
-            cached_result = cache_manager.get_qa_cache(
-                question, context_hash, model_name
-            )
-            if cached_result:
-                processing_time = time.time() - start_time
-                logger.info(f"Question answered from cache in {processing_time:.2f}s")
-                cached_sources = [
-                    SourceDocument(**src) for src in cached_result["sources"]
-                ]
-                visible_sources = cached_sources[:user_source_limit]
-                return QuestionResponse(
-                    answer=cached_result["answer"],
-                    sources=visible_sources,
-                    processing_time=round(processing_time, 2),
-                    from_cache=True,
-                )
-
-            # 缓存未命中，执行RAG查询（为本次请求构建 retriever，防止跨文档混入）
             k_effective = scoped_k if used_document_id else global_k
             search_kwargs: Dict[str, Any] = {"k": k_effective}
             if used_document_id:
@@ -285,6 +299,11 @@ class QAEngine:
                 retriever = self.vector_store.as_retriever(
                     search_type="mmr", search_kwargs=mmr_kwargs
                 )
+                retriever = EvidenceRetriever(
+                    nearest=PreparedEvidenceRetriever(documents=relevant_docs[:2]),
+                    diverse=retriever,
+                    k=k_effective,
+                )
                 logger.info(
                     "QAEngine.ask retrieval_mode=global "
                     f"user_source_limit={user_source_limit} precheck_k={precheck_k} "
@@ -292,11 +311,74 @@ class QAEngine:
                     f"lambda_mult={mmr_lambda_mult}"
                 )
 
+            relevant_docs = retriever.invoke(question)
+            if used_document_id:
+                relevant_docs = [
+                    doc
+                    for doc in relevant_docs
+                    if doc.metadata.get("document_id") == used_document_id
+                ]
+            relevant_docs = fit_question_documents(question, relevant_docs)
+            retriever = PreparedEvidenceRetriever(documents=relevant_docs)
+
+            context_hash = question_context_hash(relevant_docs)
+
+            # 获取模型配置用于缓存key（使用生效的配置，避免与默认配置混淆）
+            model_cfg = self._effective_model_config or settings.get_model_config()
+            base = (model_cfg["api_base_url"] or "https://api.openai.com/v1").rstrip(
+                "/"
+            )
+            model_name = (
+                f"{model_cfg['provider']}/{model_cfg['chat_model']}@{base}"
+                f"|bounded-evidence-v2:{global_k}:{global_fetch_k}:{mmr_lambda_mult}"
+            )
+
+            # 检查QA缓存
+            cached_result = (
+                cache_manager.get_qa_cache(question, context_hash, model_name)
+                if settings.enable_qa_cache
+                else None
+            )
+            if cached_result:
+                if deadline is not None:
+                    deadline.check()
+                processing_time = time.time() - start_time
+                logger.info(f"Question answered from cache in {processing_time:.2f}s")
+                cached_sources = [
+                    SourceDocument(**src) for src in cached_result["sources"]
+                ]
+                visible_sources = cached_sources[:user_source_limit]
+                return QuestionResponse(
+                    answer=cached_result["answer"],
+                    sources=visible_sources,
+                    processing_time=round(processing_time, 2),
+                    from_cache=True,
+                )
+
+            # 缓存未命中，执行RAG查询（为本次请求构建 retriever，防止跨文档混入）
             qa_chain = self._build_qa_chain(retriever=retriever)
-            result = qa_chain.invoke({"query": question})
+            if deadline is not None:
+                root_client = getattr(self.llm, "root_client", None)
+                if root_client is not None:
+                    timeout = deadline.provider_timeout("chat")
+                    client = root_client.with_options(timeout=timeout)
+                    llm = self.llm.model_copy(
+                        update={
+                            "root_client": client,
+                            "client": client.chat.completions,
+                        }
+                    )
+                    qa_chain.combine_documents_chain.llm_chain.llm = llm
+            config = {"callbacks": [ChatAttemptCallback()]}
+            chat_started_at = deadline.clock() if deadline is not None else None
+            result = qa_chain.invoke({"query": question}, config=config)
+            if deadline is not None:
+                deadline.check_provider_elapsed(chat_started_at, "chat")
 
             # 处理答案
             answer = result.get("result", "抱歉，我无法找到相关信息来回答这个问题。")
+            if not answer.strip():
+                raise ValueError("Model returned an empty answer")
             if fallback_note:
                 answer = f"{fallback_note}\n\n" + answer
             source_docs = result.get("source_documents", [])
@@ -320,9 +402,12 @@ class QAEngine:
 
             # 缓存结果
             sources_dict = [src.model_dump() for src in sources]
-            cache_manager.set_qa_cache(
-                question, context_hash, answer, sources_dict, model_name
-            )
+            if deadline is not None:
+                deadline.check()
+            if settings.enable_qa_cache:
+                cache_manager.set_qa_cache(
+                    question, context_hash, answer, sources_dict, model_name
+                )
 
             # 计算处理时间
             processing_time = time.time() - start_time
@@ -338,6 +423,8 @@ class QAEngine:
             return response
 
         except Exception as e:
+            if isinstance(e, SessionError) or in_question_budget():
+                raise
             processing_time = time.time() - start_time
             error_msg = f"抱歉，处理您的问题时发生了错误：{str(e)}"
 
@@ -362,10 +449,6 @@ class QAEngine:
                 metadata = doc.metadata
                 filename = metadata.get("filename", "Unknown")
                 content = doc.page_content
-
-                # 截断过长的内容
-                if len(content) > 300:
-                    content = content[:300] + "..."
 
                 source = SourceDocument(
                     document_name=filename,
@@ -403,6 +486,8 @@ class QAEngine:
             return relevant_docs
 
         except Exception as e:
+            if isinstance(e, SessionError) or in_question_budget():
+                raise
             logger.error(f"Error getting relevant documents: {str(e)}")
             return []
 
@@ -416,8 +501,9 @@ class QAEngine:
             llm_status, qa_status = "skipped", "skipped"
             collection_info = self.vector_store.get_collection_info()
             if deep is True:
+                require_query_context()
                 if self.llm:
-                    self.llm.predict("Hello")
+                    self.llm.predict("Hello", callbacks=[ChatAttemptCallback()])
                     llm_status = "connected"
                 else:
                     llm_status = "not_initialized"

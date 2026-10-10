@@ -33,6 +33,10 @@ def _admin_headers() -> dict:
 class TestCancelFunctionality:
     """测试任务取消功能"""
 
+    @pytest.fixture(autouse=True)
+    def maintenance_window(self, monkeypatch):
+        monkeypatch.setattr(settings, "enable_document_maintenance", True)
+
     def test_cancel_task_before_execution(self):
         """测试在任务执行前取消"""
         processor = AsyncDocumentProcessor(max_workers=1)
