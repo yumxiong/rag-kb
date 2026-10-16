@@ -1,0 +1,61 @@
+{
+  "source_commit": "1e759cd381adb4b29996e1f15781c4bc5296369c",
+  "platform": "linux/amd64",
+  "delivery": "offline docker image save; verify archive and loaded config digests",
+  "next_build_origin": "http://backend:8000",
+  "python_build_index": "https://pypi.org/simple",
+  "images": [
+    {
+      "tag": "rag-step5-backend:1e759cd",
+      "id": "sha256:a745708fabb1fbdc97a358ea9a4f8dc879369f99289c0c7dd1bbc4947595b6f2",
+      "os": "linux",
+      "architecture": "amd64",
+      "config_sha256": "e057f22617517e43db7d0148c5803aca7fe117c7e673b103be1b0bace8fe1bcc"
+    },
+    {
+      "tag": "rag-step5-streamlit:1e759cd",
+      "id": "sha256:08b445856571827577d17054cd78d10f99ce1e722aee7af758a512d108dd311d",
+      "os": "linux",
+      "architecture": "amd64",
+      "config_sha256": "3be8373220a5b620e42e0f2f544687ce49b96bdf339de6db25536cd6e2c8cfeb"
+    },
+    {
+      "tag": "rag-step5-next:1e759cd",
+      "id": "sha256:3feaa0904cf454dc7393021844e7ca64ca9630450ef283736ca49c34d2ea5e0e",
+      "os": "linux",
+      "architecture": "amd64",
+      "config_sha256": "eeed605a4048ee9277fb2739b37368bc8192254f6e23154b61ce127492911fb7"
+    },
+    {
+      "tag": "nginx:1.28-alpine",
+      "id": "sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236",
+      "os": "linux",
+      "architecture": "amd64",
+      "config_sha256": "dc73b49f5124cf2ee538dfbdfbd121f0b4ccdcb20fea30f3a81bd477c02e2bb5"
+    },
+    {
+      "tag": "certbot/certbot:latest",
+      "id": "sha256:78a7eaa40af657301e25731297b6e73646c695370d17e9bb03189fa82966d65c",
+      "os": "linux",
+      "architecture": "amd64",
+      "config_sha256": "bbf6837343219b270790fe2d06779bd46c7a394aaceaef0dae2f541be1d65585"
+    }
+  ],
+  "artifacts": {
+    "repository.tar": {
+      "bytes": 3246080,
+      "sha256": "9fddeb0bc6ef39137ebbe4496d652516ea6c53917f8cf5b4f529d95c03310c12"
+    },
+    "images.tar": {
+      "bytes": 891347456,
+      "sha256": "f545b199367da40ec333705b4294e9c7ecbef73c913c6c4af28762b622e2019e"
+    },
+    "knowledge-base-v3.tar.gz": {
+      "bytes": 778103,
+      "sha256": "c23c565b3bf5987c6d6d82b344c994912bf9cd72023680385a56b8eca21ff640"
+    }
+  },
+  "price_policy_expires_utc": "2026-10-23",
+  "real_ledger_included": false,
+  "target_mount_source": "REQUIRES_TARGET_VERIFICATION"
+}
