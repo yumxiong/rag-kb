@@ -15,8 +15,8 @@ services:
       ANONYMOUS_STORAGE_DEVELOPMENT: "false"
       ANONYMOUS_COOKIE_SECURE: "true"
       ENABLE_QUOTA_LIMIT: "true"
-      # Separate new-model index; never reuse or overwrite the legacy index.
-      CHROMA_DB_PATH: /app/data/chroma_qwen37_1024_v1
+      # Separate identity-labelled v3 index; never overwrite the legacy index.
+      CHROMA_DB_PATH: /app/data/chroma_v3_1024_v1
       UPLOAD_DIR: /app/data/uploads
     command: [uvicorn, app.main:app, --host, 0.0.0.0, --port, "8000", --workers, "1", --proxy-headers, --forwarded-allow-ips, 172.30.0.10, --timeout-keep-alive, "300", --timeout-graceful-shutdown, "120"]
     deploy:

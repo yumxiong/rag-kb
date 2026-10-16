@@ -9,8 +9,8 @@
 [部署参数确认](step5-deployment-decisions.md)。其后续决定优先于本文历史待确认项；
 每日 50 元的保守金额准入已在本地代码实现，见[金额准入说明](step5-money-admission.md)。
 旧固定镜像不含此能力；新镜像及目标环境尚待验收，不能直接启动付费服务。
-[受限真实对照](step5-paid-model-comparison.md)发现新嵌入模型检索回归，建议保留 v3；
-当前候选仍指向新模型，须先确认最终模型并同步调整独立索引路径。
+[受限真实对照](step5-paid-model-comparison.md)发现新嵌入模型检索回归；用户已确认保留 v3。
+候选现使用 v3 与独立 `chroma_v3_1024_v1`，见[v3 回归与知识库候选](step5-v3-release-candidate.md)。
 
 ## 候选组成
 

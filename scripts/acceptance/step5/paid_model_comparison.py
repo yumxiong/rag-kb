@@ -242,6 +242,12 @@ def main():
     parser.add_argument("--chat-key", type=Path)
     parser.add_argument("--embedding-key", type=Path)
     parser.add_argument("--output", type=Path)
+    parser.add_argument(
+        "--workflow",
+        choices=["comparison", "v3-regression", "v3-rebuild"],
+        default="comparison",
+    )
+    parser.add_argument("--review", type=Path)
     args = parser.parse_args()
     sys.path.insert(0, str(ROOT))
     chunks, questions, upper = public_inputs()
@@ -258,7 +264,22 @@ def main():
         "questions_sha256": hashlib.sha256(
             (ROOT / "docs/demo-v0.1.0/questions.json").read_bytes()
         ).hexdigest(),
+        "corpus_manifest_sha256": hashlib.sha256(
+            (ROOT / "docs/demo-v0.1.0/manifest.json").read_bytes()
+        ).hexdigest(),
     }
+    report["workflow"] = args.workflow
+    if args.workflow != "comparison":
+        report["run_cap_micros"] = (
+            12_000_000 if args.workflow == "v3-regression" else 1_000_000
+        )
+        report["planned_max_micros"] = len(chunks) * 4096
+        if args.workflow == "v3-regression":
+            report["planned_max_micros"] += len(questions) * (2_206_400 + 4096)
+        if args.initialize_ledger:
+            parser.error("V3 workflows must reuse the existing paid ledger")
+    if args.review:
+        args.review = args.review.resolve()
     if not args.execute and not args.check_environment:
         print(json.dumps(report))
         return 0
@@ -307,7 +328,12 @@ def main():
                 report["status"] = "completed"
                 report["mode"] = "environment_only_no_provider_calls"
             else:
-                run(args, report, chunks, questions)
+                if args.workflow == "comparison":
+                    run(args, report, chunks, questions)
+                else:
+                    from scripts.acceptance.step5.v3_release_check import run_v3
+
+                    run_v3(args, report, chunks, questions)
         except Exception as error:
             report.update(status="stopped", error_type=type(error).__name__)
             trace = error.__traceback__
