@@ -1,0 +1,18 @@
+# Independent of app secrets, ledger, app networks and mount-source interpolation.
+services:
+  certbot:
+    image: ${CERTBOT_IMAGE:?set reviewed Certbot image}
+    volumes:
+      - type: bind
+        source: ${DEPLOY_ROOT:?set absolute deployment root}/certbot/conf
+        target: /etc/letsencrypt
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${DEPLOY_ROOT:?set absolute deployment root}/certbot/www
+        target: /var/www/certbot
+        bind:
+          create_host_path: false
+    tmpfs:
+      - /var/lib/letsencrypt
+      - /var/log/letsencrypt

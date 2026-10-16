@@ -1,0 +1,25 @@
+# Standalone HTTP-only first issuance stage. Never combine with compose.app.yml.
+services:
+  nginx:
+    image: ${NGINX_IMAGE:?set reviewed Nginx image}
+    ports:
+      - "${BIND_IP:-0.0.0.0}:${HTTP_PORT:-80}:80"
+    volumes:
+      - type: bind
+        source: ./nginx/init.conf
+        target: /etc/nginx/conf.d/default.conf
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${DEPLOY_ROOT:?set absolute deployment root}/certbot/www
+        target: /var/www/certbot
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, "http://127.0.0.1/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped

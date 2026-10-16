@@ -1,0 +1,116 @@
+# Complete final application stack; do not combine with legacy base/overlays.
+services:
+  backend:
+    image: ${BACKEND_IMAGE:?set accepted backend image}
+    env_file:
+      - ${DEPLOY_ROOT:?set absolute deployment root}/backend.env
+    environment:
+      ALLOWED_ORIGINS: https://otocshow.xyz,https://next.otocshow.xyz
+      TRUSTED_PROXY_IPS: 172.30.0.10
+      WEB_CONCURRENCY: "1"
+      QUOTA_STORAGE_PATH: /app/data/quotas
+      ANONYMOUS_STORE_REFERENCE: /app/config/anonymous-store-reference.json
+      ANONYMOUS_MOUNT_PATH: /app/data
+      ANONYMOUS_MOUNT_SOURCE: ${ANONYMOUS_MOUNT_SOURCE:?set verified mountinfo source}
+      ANONYMOUS_STORAGE_DEVELOPMENT: "false"
+      ANONYMOUS_COOKIE_SECURE: "true"
+      ENABLE_QUOTA_LIMIT: "true"
+      CHROMA_DB_PATH: /app/data/chroma_db
+      UPLOAD_DIR: /app/data/uploads
+    command: [uvicorn, app.main:app, --host, 0.0.0.0, --port, "8000", --workers, "1", --proxy-headers, --forwarded-allow-ips, 172.30.0.10, --timeout-keep-alive, "300", --timeout-graceful-shutdown, "120"]
+    deploy:
+      replicas: 1
+    volumes:
+      - type: bind
+        source: ${DEPLOY_ROOT}/data
+        target: /app/data
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${DEPLOY_ROOT}/config/anonymous-store-reference.json
+        target: /app/config/anonymous-store-reference.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${DEPLOY_ROOT}/secrets
+        target: /run/secrets
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: [CMD, curl, -f, "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    networks:
+      rag:
+        ipv4_address: 172.30.0.2
+    restart: unless-stopped
+  frontend:
+    image: ${STREAMLIT_IMAGE:?set accepted Streamlit image}
+    environment:
+      BACKEND_URL: http://backend:8000
+      BACKEND_URL_CLIENT: https://otocshow.xyz
+      STREAMLIT_BROWSER_SERVER_ADDRESS: otocshow.xyz
+      STREAMLIT_BROWSER_SERVER_PORT: "443"
+      STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      rag:
+        ipv4_address: 172.30.0.3
+    restart: unless-stopped
+  next:
+    image: ${NEXT_IMAGE:?set accepted Next image built for http://backend:8000}
+    networks:
+      rag:
+        ipv4_address: 172.30.0.4
+    restart: unless-stopped
+  nginx:
+    image: ${NGINX_IMAGE:?set reviewed Nginx 1.28 image}
+    ports:
+      - "${BIND_IP:-0.0.0.0}:${HTTP_PORT:-80}:80"
+      - "${BIND_IP:-0.0.0.0}:${HTTPS_PORT:-443}:443"
+    volumes:
+      - type: bind
+        source: ./nginx/final
+        target: /etc/nginx/conf.d
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${DEPLOY_ROOT}/certbot/conf
+        target: /etc/letsencrypt
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${DEPLOY_ROOT}/certbot/www
+        target: /var/www/certbot
+        read_only: true
+        bind:
+          create_host_path: false
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+      next:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, "http://127.0.0.1/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      rag:
+        ipv4_address: 172.30.0.10
+    restart: unless-stopped
+networks:
+  rag:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24

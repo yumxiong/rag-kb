@@ -1,0 +1,35 @@
+# Explicit first-time ledger provisioning ONLY while backend is stopped.
+# Never use on an existing/partially provisioned store or as runtime startup.
+services:
+  bootstrap:
+    image: ${BACKEND_IMAGE:?set accepted backend image}
+    network_mode: none
+    environment:
+      PYTHONDONTWRITEBYTECODE: "1"
+    entrypoint: [python, /app/scripts/bootstrap-anonymous-store.py]
+    command:
+      - --storage
+      - /app/data/quotas
+      - --reference
+      - /reference/anonymous-store-reference.json
+      - --mount-path
+      - /app/data
+      - --mount-source
+      - ${ANONYMOUS_MOUNT_SOURCE:?set verified mountinfo source}
+    volumes:
+      - type: bind
+        source: ../../scripts/bootstrap-anonymous-store.py
+        target: /app/scripts/bootstrap-anonymous-store.py
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${DEPLOY_ROOT:?set absolute deployment root}/data
+        target: /app/data
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${DEPLOY_ROOT}/config
+        target: /reference
+        bind:
+          create_host_path: false
