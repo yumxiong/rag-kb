@@ -1,6 +1,6 @@
 """Per-question provider accounting context for the shared persistent ledger."""
 
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from contextvars import ContextVar
 
 from langchain_core.callbacks import BaseCallbackHandler
@@ -15,19 +15,24 @@ _offline_context = ContextVar("offline_provider_access", default=False)
 
 
 @contextmanager
-def offline_provider_access(*, reason: str):
+def offline_provider_access(*, reason: str, ledger=None):
     """Explicit trusted-tool scope; never derive this permission from HTTP input.
 
-    Offline costs require independent provider limits and are not public quota.
-    A question ledger, when present, always takes precedence over this scope.
+    This permission never bypasses monetary admission. Standalone tools must
+    supply the same provisioned ledger while the backend is stopped.
     """
     if not isinstance(reason, str) or not reason.strip():
         raise ValueError("An offline operation reason is required")
-    token = _offline_context.set(True)
-    try:
-        yield
-    finally:
-        _offline_context.reset(token)
+    with ExitStack() as stack:
+        if ledger is not None:
+            from app.core.provider_budget import money_ledger_scope
+
+            stack.enter_context(money_ledger_scope(ledger))
+        token = _offline_context.set(True)
+        try:
+            yield
+        finally:
+            _offline_context.reset(token)
 
 
 def require_query_context() -> None:
@@ -47,7 +52,7 @@ def require_document_maintenance() -> None:
 
 
 def require_document_provider_access() -> None:
-    """Document costs are separate; a public query cannot use this path."""
+    """Gate maintenance separately; its HTTP calls still share monetary admission."""
     if in_question_budget():
         raise SessionError("feature_disabled", 403)
     if not _offline_context.get():
@@ -74,6 +79,11 @@ def record_provider_attempt(kind: str) -> None:
 
 def in_question_budget() -> bool:
     return _budget_context.get() is not None
+
+
+def current_question_ledger():
+    context = _budget_context.get()
+    return context[0] if context is not None else None
 
 
 class ChatAttemptCallback(BaseCallbackHandler):

@@ -5,6 +5,11 @@
 `76df9da1983aa8faa9b6e789a3ec985189e41c0e`。本文中的 Linux 命令是后续操作方案，
 **需要另行授权远端准备、真实签证和启动服务**，本轮均未执行。
 
+2026-10-16 的路径、供应商、费用要求与轻量运维决定见
+[部署参数确认](step5-deployment-decisions.md)。其后续决定优先于本文历史待确认项；
+每日 50 元的保守金额准入已在本地代码实现，见[金额准入说明](step5-money-admission.md)。
+旧固定镜像不含此能力；新镜像及真实供应商尚待验收，不能直接启动付费服务。
+
 ## 候选组成
 
 - [初始化 Compose](../../docker/step5-candidate/compose.init.yml)：仅 HTTP Nginx，
@@ -17,7 +22,7 @@
   必须显式调用；挂载已审查的初始化脚本，拒绝覆盖已有或部分初始化状态。
 - [发布参数示例](../../docker/step5-candidate/release.env.example) 和
   [后端参数示例](../../docker/step5-candidate/backend.env.example)：占位符必须替换；
-  示例只含文件引用，没有密钥。预算列出代码默认值，最终经营预算尚待确认。
+  示例只含文件引用，没有密钥。次数配额与 50 元金额预算已确认，详见部署参数记录。
 - [续期脚本](../../scripts/deployment/renew-step5-certificates.sh)：宿主调度入口，
   配置预检 → Nginx 预检 → renew → Nginx 复检 → reload，失败即停止，并带互斥锁。
 
@@ -145,8 +150,8 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 17 3 * * * /bin/bash /opt/rag-kb/repository/scripts/deployment/renew-step5-certificates.sh /opt/rag-kb >> /opt/rag-kb/state/certbot-renew.log 2>&1
 ```
 
-日志仅保留在受限目录并配置轮转；上线前接入失败退出监测和证书到期告警，外部
-通知渠道另行授权。本脚本不会启动应用，也没有 Docker socket 容器挂载。renew
+日志仅保留在受限目录并配置轮转；用户选择暂不搭建监控，改为人工定期检查续期
+结果和证书有效期，不依赖 ACME 邮件。本脚本不会启动应用，也没有 Docker socket 容器挂载。renew
 没有更新证书时仍可能成功，允许每日一次无变更重载。真实 `renew --dry-run`
 及定时任务执行须在目标机另行验收；本轮没有创建账户、申请证书或安装 cron。
 

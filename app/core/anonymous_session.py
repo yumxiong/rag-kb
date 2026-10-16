@@ -14,6 +14,8 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+from app.core.money_ledger import initial_money_state, validate_money_state
+
 TOKEN_PATTERN = re.compile(r"anon_v1_[A-Za-z0-9_-]{43}\Z")
 SESSION_LIFETIME = 2_592_000
 BUDGET_KEYS = (
@@ -115,7 +117,13 @@ def bootstrap(
     store_id = str(uuid.uuid4())
     _write_atomic(
         storage / "quota-state-v1.json",
-        {"schema_version": 1, "store_id": store_id, "sessions": {}, "days": {}},
+        {
+            "schema_version": 1,
+            "store_id": store_id,
+            "sessions": {},
+            "days": {},
+            "money": initial_money_state(),
+        },
         development,
     )
     _write_atomic(storage / "initialized-v1.json", {"store_id": store_id}, development)
@@ -200,6 +208,8 @@ class AnonymousSessionStore:
     def _validate(state: dict) -> None:
         if state["schema_version"] != 1:
             raise ValueError("Unknown schema")
+        if "money" in state:
+            validate_money_state(state["money"])
         if not isinstance(state["sessions"], dict) or not isinstance(
             state["days"], dict
         ):
@@ -398,6 +408,8 @@ class AnonymousSessionStore:
             }
 
     def budget_snapshot(self, limits: dict) -> dict:
+        from app.core.money_ledger import MoneyLedger
+
         with self._lock:
             self._ensure_healthy()
             budget = self.state["days"].get(self._day(), {}).get("budget", {})
@@ -408,6 +420,7 @@ class AnonymousSessionStore:
                 "limits": dict(limits),
                 "counts": {key: budget.get(key, 0) for key in BUDGET_KEYS},
                 "usage": None,
+                "money": MoneyLedger(self).snapshot(),
             }
 
     def quota_stats(self, limit: int) -> dict:

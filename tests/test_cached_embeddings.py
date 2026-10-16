@@ -391,7 +391,9 @@ class TestCachedEmbeddingsIntegration:
         """测试大批量文档的性能"""
         # 创建模拟的基础嵌入模型
         base_embeddings = Mock()
-        base_embeddings.embed_documents.return_value = [[0.1] * 768] * 100
+        base_embeddings.embed_documents.side_effect = lambda texts: [
+            [0.1] * 768 for _ in texts
+        ]
 
         with patch("app.core.cached_embeddings.cache_manager") as mock_cache_manager:
             # 模拟50%缓存命中率

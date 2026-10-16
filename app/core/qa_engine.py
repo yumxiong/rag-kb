@@ -3,6 +3,7 @@ RAG问答引擎模块
 """
 
 import logging
+import secrets
 import time
 from typing import Any, Dict, List, Optional
 
@@ -21,6 +22,7 @@ from app.core.global_budget import (
     in_question_budget,
     require_query_context,
 )
+from app.core.provider_budget import provider_http_clients, reraise_budget_cause
 from app.core.question_cost import (
     QA_PROMPT,
     fit_question_documents,
@@ -109,8 +111,6 @@ class QAEngine:
                 "max_tokens": settings.llm_max_tokens,
                 "max_retries": 0,
                 "cache": False,
-                "http_client": httpx.Client(follow_redirects=False),
-                "http_async_client": httpx.AsyncClient(follow_redirects=False),
             }
             chat_timeout = getattr(settings, "chat_timeout_seconds", None)
             if isinstance(chat_timeout, (int, float)) and not isinstance(
@@ -119,6 +119,19 @@ class QAEngine:
                 llm_kwargs["timeout"] = chat_timeout
             if model_config["provider"] == "deepseek":
                 llm_kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
+
+            # A user-supplied key is exempt only if it is not the configured
+            # project credential. Embeddings always use the project budget.
+            project_key = not overrides.get("api_key") or secrets.compare_digest(
+                str(api_key), str(settings.get_api_key() or "")
+            )
+            if project_key:
+                llm_kwargs.update(provider_http_clients("chat"))
+            else:
+                llm_kwargs.update(
+                    http_client=httpx.Client(follow_redirects=False),
+                    http_async_client=httpx.AsyncClient(follow_redirects=False),
+                )
 
             # 设置自定义API端点（如果指定）
             if (
@@ -371,7 +384,11 @@ class QAEngine:
                     qa_chain.combine_documents_chain.llm_chain.llm = llm
             config = {"callbacks": [ChatAttemptCallback()]}
             chat_started_at = deadline.clock() if deadline is not None else None
-            result = qa_chain.invoke({"query": question}, config=config)
+            try:
+                result = qa_chain.invoke({"query": question}, config=config)
+            except Exception as error:
+                reraise_budget_cause(error)
+                raise
             if deadline is not None:
                 deadline.check_provider_elapsed(chat_started_at, "chat")
 

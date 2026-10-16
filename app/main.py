@@ -22,6 +22,7 @@ from app.api.qa import router as qa_router
 from app.core.anonymous_session import AnonymousSessionStore, SessionError
 from app.core.concurrency import ConcurrencyLimitMiddleware
 from app.core.config import settings
+from app.core.provider_budget import register_project_ledger, unregister_project_ledger
 from app.core.rate_limiter import limiter
 from app.models.schemas import HealthCheck
 
@@ -55,11 +56,13 @@ async def lifespan(app: FastAPI):
     )
     app.state.session_rate_limit = SessionRateLimit()
     try:
+        register_project_ledger(app.state.anonymous_store)
         yield
     finally:
         from app.core.concurrency import shutdown_qa_executor
 
         shutdown_qa_executor(wait=True)
+        unregister_project_ledger(app.state.anonymous_store)
         app.state.anonymous_store.close()
 
     # 关闭时清理

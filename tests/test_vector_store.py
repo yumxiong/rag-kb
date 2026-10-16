@@ -14,6 +14,25 @@ from app.core.vector_store import VectorStore
 
 
 @pytest.fixture(autouse=True)
+def managed_chroma_clients():
+    """Close real synthetic clients even when a LangChain wrapper is mocked."""
+    import chromadb
+
+    factory = chromadb.PersistentClient
+    clients = []
+
+    def create(*args, **kwargs):
+        client = factory(*args, **kwargs)
+        clients.append(client)
+        return client
+
+    with patch("app.core.vector_store.chromadb.PersistentClient", side_effect=create):
+        yield clients
+    for client in clients:
+        client._system.stop()
+
+
+@pytest.fixture(autouse=True)
 def offline_scope():
     with offline_provider_access(reason="isolated vector store unit tests"):
         yield
@@ -23,10 +42,12 @@ class TestVectorStore:
     """Vector Store 测试类"""
 
     @pytest.fixture
-    def temp_db_path(self):
+    def temp_db_path(self, managed_chroma_clients):
         """创建临时数据库路径"""
         with tempfile.TemporaryDirectory() as temp_dir:
             yield os.path.join(temp_dir, "test_chroma")
+            for client in managed_chroma_clients:
+                client._system.stop()
 
     @pytest.fixture
     def mock_settings(self, temp_db_path):
@@ -81,6 +102,9 @@ class TestVectorStore:
             vector_store.chroma_client = mock_vectorstore._client
             vector_store.embeddings = mock_embeddings
             vector_store._initialized = True
+            mock_vectorstore._client.get_collection.return_value.metadata = (
+                vector_store._index_identity()
+            )
 
             return vector_store
 
@@ -120,12 +144,15 @@ class TestVectorStore:
             vector_store._initialize_embeddings()
 
             # 验证OpenAIEmbeddings被正确调用
-            mock_openai_embeddings.assert_called_once_with(
-                api_key="test-embedding-key",
-                model="text-embedding-ada-002",
-                max_retries=0,
-                check_embedding_ctx_length=False,
-            )
+            mock_openai_embeddings.assert_called_once()
+            call = mock_openai_embeddings.call_args.kwargs
+            assert call["api_key"] == "test-embedding-key"
+            assert call["model"] == "text-embedding-ada-002"
+            assert call["max_retries"] == 0
+            assert call["check_embedding_ctx_length"] is False
+            from app.core.provider_budget import BudgetedTransport
+
+            assert isinstance(call["http_client"]._transport, BudgetedTransport)
 
             # 验证CachedEmbeddings被创建（新实现包含 base URL 后缀）
             args, kwargs = mock_cached_embeddings.call_args
@@ -144,18 +171,21 @@ class TestVectorStore:
             with pytest.raises(ValueError, match="API key not configured"):
                 vector_store._initialize_embeddings()
 
-    def test_qwen_compatible_endpoint_receives_text(self, mock_settings):
+    @pytest.mark.parametrize("model", ["text-embedding-v3", "qwen3.7-text-embedding"])
+    def test_qwen_compatible_endpoint_receives_text(self, mock_settings, model):
         """Qwen must honor its configured endpoint and send text, not token IDs."""
         from langchain_openai import OpenAIEmbeddings
 
         mock_settings.get_model_config.return_value = {
             "embedding_provider": "qwen",
-            "embedding_model": "text-embedding-v3",
+            "embedding_model": model,
+            "embedding_dimensions": 1024,
             "embedding_api_base_url": (
                 "https://dashscope.aliyuncs.com/compatible-mode/v1"
             ),
         }
         VectorStore._instance = None
+        mock_settings.embedding_timeout_seconds = 15
         with patch("app.core.vector_store.CachedEmbeddings") as cached:
             store = VectorStore()
             store._initialize_embeddings()
@@ -166,6 +196,11 @@ class TestVectorStore:
             embeddings.client = client
             assert embeddings.embed_documents(["导出文件保留七天"]) == [[0.1, 0.2]]
             assert client.create.call_args.kwargs["input"] == "导出文件保留七天"
+            assert client.create.call_args.kwargs["dimensions"] == 1024
+            assert client.create.call_args.kwargs["model"] == model
+            assert embeddings.chunk_size == 10
+            assert embeddings.request_timeout == 15
+            assert embeddings.max_retries == 0
             assert embeddings.openai_api_base == (
                 "https://dashscope.aliyuncs.com/compatible-mode/v1"
             )

@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 
 import chromadb
 from chromadb.config import Settings as ChromaSettings
+from chromadb.errors import InvalidCollectionException, NotFoundError
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
@@ -15,8 +16,13 @@ from langchain_openai import OpenAIEmbeddings
 from app.core.anonymous_session import SessionError
 from app.core.cached_embeddings import CachedEmbeddings
 from app.core.config import settings
+from app.core.provider_budget import provider_http_clients
 
 logger = logging.getLogger(__name__)
+
+
+class IndexIdentityError(ValueError):
+    """The configured embedding identity does not match an existing index."""
 
 
 class VectorStore:
@@ -51,6 +57,7 @@ class VectorStore:
         if not self._initialized:
             with self._lock:  # 添加线程锁保护
                 if not self._initialized:
+                    self._ensure_chroma_client_only()
                     self._initialize_embeddings()
                     self._initialize_vectorstore()
                     self._initialized = True
@@ -72,6 +79,7 @@ class VectorStore:
 
             provider = model_config.get("embedding_provider")
             model_name = model_config["embedding_model"]
+            dimensions = model_config.get("embedding_dimensions")
 
             # 使用配置的兼容端点，避免绕过 embedding_api_base_url。
             embedding_kwargs = {
@@ -92,13 +100,20 @@ class VectorStore:
             if provider == "qwen":
                 # DashScope 接收文本，不接收 OpenAI tokenizer 的 token IDs。
                 embedding_kwargs["chunk_size"] = 10
+            if dimensions is not None:
+                embedding_kwargs["dimensions"] = dimensions
+            embedding_kwargs.update(provider_http_clients("embedding"))
             base_embeddings = OpenAIEmbeddings(**embedding_kwargs)
 
             # 使用缓存包装器
             base = (embedding_api_url or "https://api.openai.com/v1").rstrip("/")
             self.embeddings = CachedEmbeddings(
                 base_embeddings=base_embeddings,
-                model_name=f"{provider}/{model_name}@{base}",
+                dimensions=dimensions,
+                model_name=(
+                    f"{provider}/{model_name}@{base}"
+                    f"#dimensions={dimensions or 'provider-default'}"
+                ),
             )
 
             logger.info(
@@ -113,6 +128,7 @@ class VectorStore:
     def _initialize_vectorstore(self):
         """初始化向量存储"""
         try:
+            self._ensure_chroma_client_only()
             # 配置ChromaDB
             chroma_settings = ChromaSettings(
                 persist_directory=settings.chroma_db_path,
@@ -127,6 +143,7 @@ class VectorStore:
                 embedding_function=self.embeddings,
                 persist_directory=settings.chroma_db_path,
                 client_settings=chroma_settings,
+                client=self.chroma_client,
             )
 
             # 获取底层的chroma_client用于直接操作
@@ -138,12 +155,40 @@ class VectorStore:
             logger.error(f"Error initializing vector store: {str(e)}")
             raise
 
-    def _ensure_chroma_client_only(self):
-        """仅初始化Chroma客户端（不初始化嵌入模型），用于轻量级元数据查询"""
-        if self.chroma_client is not None:
-            return
+    def _index_identity(self) -> dict:
+        """Non-secret identity persisted with every new collection."""
+        config = settings.get_model_config()
+        return {
+            "rag_identity_schema": 1,
+            "rag_embedding_provider": config["embedding_provider"],
+            "rag_embedding_model": config["embedding_model"],
+            "rag_embedding_endpoint": (
+                config.get("embedding_api_base_url") or "https://api.openai.com/v1"
+            ).rstrip("/"),
+            "rag_embedding_dimensions": (
+                config.get("embedding_dimensions") or "provider-default"
+            ),
+            "rag_index_version": config.get("embedding_index_version", 1),
+        }
+
+    def _checked_collection(self, name: str):
+        """Create missing collections; never relabel an existing index."""
+        expected = self._index_identity()
         try:
-            # 直接使用持久化客户端，避免LangChain封装与embeddings初始化
+            collection = self.chroma_client.get_collection(name)
+        except (InvalidCollectionException, NotFoundError):
+            collection = self.chroma_client.create_collection(name, metadata=expected)
+        actual = collection.metadata or {}
+        if any(actual.get(key) != value for key, value in expected.items()):
+            raise IndexIdentityError(
+                "Embedding index identity missing or mismatched; use a separate "
+                "new index and rebuild explicitly. Existing index was not changed."
+            )
+        return collection
+
+    def _ensure_chroma_client_only(self):
+        """Validate identity without loading credentials or calling a provider."""
+        if self.chroma_client is None:
             self.chroma_client = chromadb.PersistentClient(
                 path=settings.chroma_db_path,
                 settings=ChromaSettings(
@@ -152,22 +197,14 @@ class VectorStore:
                     is_persistent=True,
                 ),
             )
-            # 确保集合存在
-            try:
-                self.chroma_client.get_collection(self.collection_name)
-            except Exception:
-                self.chroma_client.create_collection(self.collection_name)
-            logger.debug("Chroma client (lightweight) initialized")
-        except Exception as e:
-            logger.error(f"Error initializing lightweight Chroma client: {str(e)}")
-            # 兜底：如果轻量初始化失败，回退到完整初始化
-            self._ensure_initialized()
+        self._checked_collection(self.collection_name)
 
     def get_chroma(self, collection_name: str) -> Chroma:
         self._ensure_initialized()
         if collection_name == self.collection_name:
             return self.vectorstore
 
+        self._checked_collection(collection_name)
         return Chroma(
             collection_name=collection_name,
             embedding_function=self.embeddings,

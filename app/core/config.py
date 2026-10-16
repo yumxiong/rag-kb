@@ -60,6 +60,20 @@ class Settings(BaseSettings):
     embedding_api_base_url: Optional[str] = None  # 嵌入模型API端点
     chat_model: str = "gpt-3.5-turbo"  # 聊天模型
     embedding_model: str = "text-embedding-ada-002"  # 嵌入模型
+    embedding_dimensions: Optional[int] = None
+    embedding_index_version: int = 1
+
+    @field_validator("embedding_dimensions", "embedding_index_version", mode="before")
+    @classmethod
+    def validate_embedding_identity(cls, value, info):
+        """Reject ambiguous dimensions and revisions before opening storage."""
+        if value is None and info.field_name == "embedding_dimensions":
+            return None
+        if isinstance(value, str) and value.isascii() and value.isdecimal():
+            value = int(value)
+        if type(value) is not int or value <= 0:
+            raise ValueError("Embedding dimensions and index version must be positive")
+        return value
 
     # 存储配置
     upload_dir: str = "./data/uploads"
@@ -499,6 +513,8 @@ class Settings(BaseSettings):
             "embedding_model": self.embedding_model,
             "api_base_url": self.api_base_url,
             "embedding_api_base_url": self.embedding_api_base_url,
+            "embedding_dimensions": self.embedding_dimensions,
+            "embedding_index_version": self.embedding_index_version,
         }
 
         # 应用覆盖项

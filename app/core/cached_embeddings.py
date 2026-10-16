@@ -15,6 +15,7 @@ from app.core.global_budget import (
     require_document_provider_access,
     require_query_context,
 )
+from app.core.provider_budget import reraise_budget_cause
 
 logger = logging.getLogger(__name__)
 
@@ -22,11 +23,21 @@ logger = logging.getLogger(__name__)
 class CachedEmbeddings(Embeddings):
     """带缓存的嵌入模型包装器"""
 
-    def __init__(self, base_embeddings: Embeddings, model_name: str):
+    def __init__(
+        self,
+        base_embeddings: Embeddings,
+        model_name: str,
+        dimensions: int | None = None,
+    ):
         self.base_embeddings = base_embeddings
         self.model_name = model_name
         self.cache_hits = 0
         self.api_calls = 0
+        self.dimensions = dimensions
+
+    def _validate_dimension(self, vector):
+        if self.dimensions is not None and len(vector) != self.dimensions:
+            raise ValueError("Embedding response/cache dimension does not match index")
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         """嵌入文档列表（支持批量缓存）"""
@@ -38,6 +49,7 @@ class CachedEmbeddings(Embeddings):
         for i, text in enumerate(texts):
             cached_embedding = cache_manager.get_embedding_cache(text, self.model_name)
             if cached_embedding is not None:
+                self._validate_dimension(cached_embedding)
                 embeddings.append(cached_embedding)
                 self.cache_hits += 1
                 logger.debug(f"Cache hit for document {i+1}/{len(texts)}")
@@ -52,7 +64,15 @@ class CachedEmbeddings(Embeddings):
             logger.info(
                 f"Generating embeddings for {len(texts_to_embed)}/{len(texts)} texts"
             )
-            new_embeddings = self.base_embeddings.embed_documents(texts_to_embed)
+            try:
+                new_embeddings = self.base_embeddings.embed_documents(texts_to_embed)
+            except Exception as error:
+                reraise_budget_cause(error)
+                raise
+            if len(new_embeddings) != len(texts_to_embed):
+                raise ValueError("Embedding response count does not match input")
+            for vector in new_embeddings:
+                self._validate_dimension(vector)
             self.api_calls += len(texts_to_embed)
 
             # 更新结果和缓存
@@ -73,6 +93,7 @@ class CachedEmbeddings(Embeddings):
         # 检查缓存
         cached_embedding = cache_manager.get_embedding_cache(text, self.model_name)
         if cached_embedding is not None:
+            self._validate_dimension(cached_embedding)
             self.cache_hits += 1
             logger.debug("Cache hit for query embedding")
             return cached_embedding
@@ -88,7 +109,12 @@ class CachedEmbeddings(Embeddings):
                 client = root_client.with_options(timeout=timeout)
                 provider = provider.model_copy(update={"client": client.embeddings})
         started_at = deadline.clock() if deadline is not None else None
-        embedding = provider.embed_query(text)
+        try:
+            embedding = provider.embed_query(text)
+        except Exception as error:
+            reraise_budget_cause(error)
+            raise
+        self._validate_dimension(embedding)
         if deadline is not None:
             deadline.check_provider_elapsed(started_at, "embedding")
         self.api_calls += 1
