@@ -1,30 +1,30 @@
 {
-  "source_commit": "1e759cd381adb4b29996e1f15781c4bc5296369c",
+  "source_commit": "4d1ba85b46ade64bae52d5c200e3660c2671de0b",
   "platform": "linux/amd64",
   "delivery": "offline docker image save; verify archive and loaded config digests",
   "next_build_origin": "http://backend:8000",
   "python_build_index": "https://pypi.org/simple",
   "images": [
     {
-      "tag": "rag-step5-backend:1e759cd",
-      "id": "sha256:a745708fabb1fbdc97a358ea9a4f8dc879369f99289c0c7dd1bbc4947595b6f2",
+      "tag": "rag-step5-backend:4d1ba85",
+      "id": "sha256:798a32f593e92f632493b28cb9f561be624dfa5296d0bf207e65d33b6d9fd2bc",
       "os": "linux",
       "architecture": "amd64",
-      "config_sha256": "e057f22617517e43db7d0148c5803aca7fe117c7e673b103be1b0bace8fe1bcc"
+      "config_sha256": "343dead549df1435120992904ed99ce09a2c1a25485d5932fa0aefd63586db76"
     },
     {
-      "tag": "rag-step5-streamlit:1e759cd",
-      "id": "sha256:08b445856571827577d17054cd78d10f99ce1e722aee7af758a512d108dd311d",
+      "tag": "rag-step5-streamlit:4d1ba85",
+      "id": "sha256:509d44e0ba8e18360496758932cc763ec1212eebc55f41028364834c3aada8e3",
       "os": "linux",
       "architecture": "amd64",
-      "config_sha256": "3be8373220a5b620e42e0f2f544687ce49b96bdf339de6db25536cd6e2c8cfeb"
+      "config_sha256": "65662d36a43bb96a43b1482622b83f0c97b8a1951c95374689fe6c52fc86c87c"
     },
     {
-      "tag": "rag-step5-next:1e759cd",
-      "id": "sha256:3feaa0904cf454dc7393021844e7ca64ca9630450ef283736ca49c34d2ea5e0e",
+      "tag": "rag-step5-next:4d1ba85",
+      "id": "sha256:b30b05d6c83f6f184512cd55e71a7029e2baafacb0774ff3eafbe99fc1a9c2f1",
       "os": "linux",
       "architecture": "amd64",
-      "config_sha256": "eeed605a4048ee9277fb2739b37368bc8192254f6e23154b61ce127492911fb7"
+      "config_sha256": "baece8013ba8c510eab773f6dae9d304b72c444de6c809dd337cefa6b880c99b"
     },
     {
       "tag": "nginx:1.28-alpine",
@@ -43,19 +43,21 @@
   ],
   "artifacts": {
     "repository.tar": {
-      "bytes": 3246080,
-      "sha256": "9fddeb0bc6ef39137ebbe4496d652516ea6c53917f8cf5b4f529d95c03310c12"
+      "bytes": 3266560,
+      "sha256": "ee7daf60f2690d1625bd3363e4a21b90bfaec3b830daaae2f947e30126c39c66"
     },
     "images.tar": {
       "bytes": 891347456,
-      "sha256": "f545b199367da40ec333705b4294e9c7ecbef73c913c6c4af28762b622e2019e"
+      "sha256": "41d67dea1cc3e0f2a8bae231a299ae67f8b2b32ef8de8a806db6f18c5ee049b9"
     },
     "knowledge-base-v3.tar.gz": {
       "bytes": 778103,
       "sha256": "c23c565b3bf5987c6d6d82b344c994912bf9cd72023680385a56b8eca21ff640"
     }
   },
-  "price_policy_expires_utc": "2026-10-23",
+  "price_policy_expires_utc": null,
   "real_ledger_included": false,
-  "target_mount_source": "REQUIRES_TARGET_VERIFICATION"
+  "target_mount_source": "REQUIRES_TARGET_VERIFICATION",
+  "price_policy_id": "cny-2026-10-17-full-context-v2-no-expiry",
+  "price_update_mode": "manual; no scheduled expiry"
 }

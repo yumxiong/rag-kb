@@ -1,31 +1,35 @@
-# Step5 本地固定交付清单（2026-10-16）
+# Step5 本地固定交付清单（2026-10-17）
 
-应用源提交：`1e759cd381adb4b29996e1f15781c4bc5296369c`。
+应用源提交：`4d1ba85b46ade64bae52d5c200e3660c2671de0b`。
 本次从该提交的 `git archive` 干净快照构建三个 linux/amd64 应用镜像，
 Next 构建参数为 `RAG_BACKEND_ORIGIN=http://backend:8000`。
 后端和 Streamlit 默认依赖镜像源返回无匹配版本，改用官方 PyPI 后成功；
 未更改固定依赖版本。部分传递依赖未完全锁定，因此以本次保存的镜像为交付依据，
 不保证日后重新构建逐字节一致。实际 Python 依赖清单保留在交付目录。
 
-## 2026-10-17 源码变更后的交付状态
+## 本次更新
 
-用户已取消价格策略到期阻断，源码改为持续有效、人工调价。下列归档与 manifest
-仍是 2026-10-16 的历史固定产物，包含旧到期逻辑；不得作为本次新策略的部署包。
-部署前必须提交新源码、重建应用镜像并重新生成和验收固定交付清单。
+取消固定价格策略到期阻断，策略 `cny-2026-10-17-full-context-v2-no-expiry`
+持续有效，价格需要时人工调整。新后端镜像内断网运行金额专项 **33 passed**，
+覆盖原到期日、其后及 2030 年继续准入，同时保留 50 元限额和时钟倒退保护。
+每日准入按配置单价计算，供应商变价可能使实际账单偏离预留金额。
+三个应用镜像均从本次源提交重建；首次因 Docker 引擎未启动而未能构建，启动后成功。
+2026-10-16 的旧包保留供追溯，不再作为当前部署候选。
 
 ## 固定文件
 
 机器可读清单：[step5-fixed-delivery-manifest.json](step5-fixed-delivery-manifest.json)。
-本地交付目录：`rag-step5-local-delivery-20261016/`（Git 忽略）。
+本地交付目录：`rag-step5-local-delivery-20261017/`（Git 忽略）。
 仅交付以下文件，不打包整个目录中的构建上下文、日志或其他验收文件：
 
-- `repository.tar`：固定应用源快照，3,246,080 字节。
+- `repository.tar`：固定应用源快照，3,266,560 字节。
 - `images.tar`：三个应用及 Nginx、Certbot 离线镜像，891,347,456 字节。
 - `knowledge-base-v3.tar.gz`：公开 AtlasDesk 9 文档、32 分块，778,103 字节。
 - `delivery-manifest.json`、`SHA256SUMS`、`release.env.candidate`。
 - `backend-dependencies.txt`、`streamlit-dependencies.txt`。
 
-源快照不包含随后提交的本报告和 Linux 验收脚本；这些仅记录交付验收，不改变应用镜像。
+源快照包含构建时的历史报告及验收脚本；当前清单和本报告在构建验收后另行提交，
+以交付目录外置的 delivery-manifest.json 为当前产物清单，不以源快照内旧清单覆盖它。
 知识库包含原文、Chroma 索引及逐文件哈希，不包含密钥、金额账本、reference 或证书。
 镜像归档的所有 SHA256 blob 均重新校验，标签集合与清单一致。
 Docker containerd 的镜像 ID 可能是索引摘要，传统 Docker 显示的 ID 可能是配置摘要；
@@ -48,8 +52,9 @@ Docker containerd 的镜像 ID 可能是索引摘要，传统 Docker 显示的 I
   和各写入边界失败保护。所有本次临时卷已清理。
 
 入口为 `scripts/acceptance/step5/run_linux_delivery.py`，只允许对可丢弃测试卷运行。
+本轮命令：`python scripts/acceptance/step5/run_linux_delivery.py --image rag-step5-backend:4d1ba85 --output rag-step5-local-delivery-20261017`。
 结果在交付目录 `linux-results.json` 和 `linux-check.txt`，不含真实密钥或生产账本。
-此前完整 Python 测试 739 passed、覆盖率 81.66%；本轮仅新增离线交付验收脚本，
+此前完整 Python 测试 739 passed、覆盖率 81.66%；本轮对价格策略修改执行 33 项 Linux 镜像内专项回归及上述交付/恢复重验，
 没有重新运行历史前端全范围 lint，也没有执行真实供应商或公网验收。
 
 ## 后续部署门槛
@@ -60,7 +65,7 @@ data、config/reference、外置 backend.env、secrets 与证书分别按候选�
 `release.env.candidate` 的 mount source 是阻断性占位符，不可原样启动。
 目标服务器的存储恢复、容量、真实供应商调用和公网入口仍待目标环境验证。
 
-旧交付镜像的价格策略在 **2026-10-23 UTC** 失效；新的持续有效策略须经重建交付后生效。
+当前交付镜像已采用无固定到期的价格策略，无需定期延期；价格变更由人工维护。
 真实验收金额账本 `rag-step5-local-paid-state` 不在本次公开交付包中；必须另行规划安全迁移，
 保留已消费及未决金额，并停止旧写入者。不能用本次合成账本替换，也不能直接初始化零账本
 从而绕过每日 50 元统一金额准入。
