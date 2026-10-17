@@ -1,5 +1,6 @@
 """Run offline Linux probes and remove only this run's disposable volumes."""
 
+import argparse
 import json
 import subprocess
 import uuid
@@ -8,7 +9,12 @@ from pathlib import Path
 
 def main():
     root = Path(__file__).resolve().parents[3]
-    output = root / "rag-step5-local-delivery-20261016"
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--image", required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    options = parser.parse_args()
+    output = options.output.resolve()
+    output.mkdir(parents=True, exist_ok=True)
     scripts = Path(__file__).parent
     prefix = "rag-delivery-" + uuid.uuid4().hex[:12]
     volumes = [
@@ -54,7 +60,7 @@ def main():
         ]
         docker(
             *args,
-            "rag-step5-backend:1e759cd",
+            options.image,
             "python",
             "/probe/linux_delivery_check.py",
             phase,
@@ -80,7 +86,7 @@ def main():
             f"{scripts}:/probe:ro",
             *mount(volumes[5], "/storage-tests"),
             *mount(volumes[6], "/reference-tests"),
-            "rag-step5-backend:1e759cd",
+            options.image,
             "python",
             "/probe/storage_checks.py",
         )

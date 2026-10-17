@@ -14,9 +14,9 @@ import httpx
 from app.core.anonymous_session import SessionError
 from app.core.money_ledger import MoneyLedger
 
-POLICY_ID = "cny-2026-10-16-full-context-v1"
+POLICY_ID = "cny-2026-10-17-full-context-v2-no-expiry"
 POLICY_START = "2026-10-16"
-POLICY_EXPIRES = "2026-10-23"  # Exclusive; re-review before extending.
+# Prices remain effective until manually revised; no scheduled expiry.
 CHAT_ENDPOINT = "https://api.deepseek.com/chat/completions"
 EMBEDDING_ENDPOINT = "https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings"
 _offline_ledger = ContextVar("offline_money_ledger", default=None)
@@ -132,7 +132,7 @@ def quote_request(request: httpx.Request, kind: str) -> int:
 
 def reserve_request(request, kind):
     money = current_money_ledger()
-    if not POLICY_START <= money.store._day() < POLICY_EXPIRES:
+    if money.store._day() < POLICY_START:
         raise SessionError("service_unavailable", 503)
     amount = quote_request(request, kind)
     identifier = money.reserve(amount, policy=f"{POLICY_ID}:{kind}")

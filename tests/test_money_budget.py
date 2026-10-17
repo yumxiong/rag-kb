@@ -194,20 +194,38 @@ def test_unreviewed_parameters_rejected_without_dispatch(account, updates):
     assert MoneyLedger(store).snapshot()["reserved_today"] == 0
 
 
-def test_expired_price_policy_and_clock_rollback_fail_closed(account):
+def test_clock_rollback_fails_closed(account):
     store, now = account
     money = MoneyLedger(store)
     money.reserve(1, policy=POLICY_ID)
     now[0] -= 86400
     with pytest.raises(SessionError):
         money.reserve(1, policy=POLICY_ID)
-    now[0] += 8 * 86400
+    now[0] += 86400
     handler = Mock(side_effect=success)
-    with money_ledger_scope(store), pytest.raises(SessionError):
-        BudgetedTransport("chat", httpx.MockTransport(handler)).handle_request(
-            chat_request()
-        )
+    with money_ledger_scope(store):
+        now[0] -= 86400
+        with pytest.raises(SessionError):
+            BudgetedTransport("chat", httpx.MockTransport(handler)).handle_request(
+                chat_request()
+            )
     handler.assert_not_called()
+
+
+@pytest.mark.parametrize("day", ["2026-10-23", "2026-10-24", "2030-01-01"])
+def test_price_policy_remains_active_and_enforces_cap(account, day):
+    store, now = account
+    now[0] = datetime.fromisoformat(day).replace(tzinfo=timezone.utc).timestamp()
+    handler = Mock(side_effect=success)
+    money = MoneyLedger(store)
+    with money_ledger_scope(store):
+        transport = BudgetedTransport("chat", httpx.MockTransport(handler))
+        transport.handle_request(chat_request())
+        assert money.snapshot()["reserved_today"] == 2_206_400
+        money.reserve(DAILY_CAP_MICROS - 2_206_400, policy=POLICY_ID)
+        with pytest.raises(SessionError, match="global_budget_exceeded"):
+            transport.handle_request(chat_request())
+    handler.assert_called_once()
 
 
 def test_missing_money_state_is_not_initialized(account):
