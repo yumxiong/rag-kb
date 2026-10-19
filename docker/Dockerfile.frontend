@@ -26,10 +26,6 @@ RUN set -eux; \
 # 设置工作目录
 WORKDIR /app
 
-# Streamlit adds /app/frontend for its entrypoint imports; package imports also
-# need /app when launched by the streamlit console script.
-ENV PYTHONPATH=/app
-
 # 安装系统依赖
 RUN apt-get update && apt-get install -y \
   curl \
@@ -44,6 +40,10 @@ RUN pip install --upgrade pip -i $PIP_INDEX_URL \
 
 # 复制前端代码
 COPY frontend/ ./frontend/
+
+# Streamlit adds /app/frontend for its entrypoint imports; package imports also
+# need /app when launched by the streamlit console script.
+ENV PYTHONPATH=/app
 
 # 暴露端口
 EXPOSE 8501
