@@ -1,5 +1,10 @@
 # Step5 本地固定交付清单（2026-10-17）
 
+2026-10-19 Streamlit 单服务补丁已部署：当前 `STREAMLIT_IMAGE=rag-step5-streamlit:21271bf`。
+原始 2026-10-17 归档及其他镜像保持不变；恢复部署时须叠加清单的
+`current_image_overrides`，不能仅加载旧包恢复有缺陷的 Streamlit。
+补丁详情和真实页面验收见 [Streamlit 修复记录](step5-streamlit-import-fix-20261019.md)。
+
 应用源提交：`4d1ba85b46ade64bae52d5c200e3660c2671de0b`。
 本次从该提交的 `git archive` 干净快照构建三个 linux/amd64 应用镜像，
 Next 构建参数为 `RAG_BACKEND_ORIGIN=http://backend:8000`。

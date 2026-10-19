@@ -59,5 +59,21 @@
   "real_ledger_included": false,
   "target_mount_source": "REQUIRES_TARGET_VERIFICATION",
   "price_policy_id": "cny-2026-10-17-full-context-v2-no-expiry",
-  "price_update_mode": "manual; no scheduled expiry"
+  "price_update_mode": "manual; no scheduled expiry",
+  "streamlit_patch_20261019": {
+    "image": "rag-step5-streamlit:21271bf",
+    "id": "sha256:16edb0a8bc576f3803fc039f0b03c965af5028d5a60cc00d3db00f81ba50b94a",
+    "source_commit": "21271bf95aed2905ee34d1296806626e5fa78496",
+    "archive_sha256": "fcb71bf4c3cc06604164fdc79a4b9c536ed5d511f9fb8c7f816b43b159d199f2",
+    "archive_bytes": 326279168,
+    "dependencies_identical_to_previous": true,
+    "config_sha256": "764ef369050ebc196e869f2e92d902f3947db54ef1bb408b2057d1e3f7fdb891",
+    "local_directory": "rag-step5-local-streamlit-fix-20261019/final",
+    "server_directory": "/opt/rag-kb/releases/20261019-streamlit-21271bf",
+    "supersedes_image": "rag-step5-streamlit:4d1ba85",
+    "original_artifacts_preserved": true
+  },
+  "current_image_overrides": {
+    "STREAMLIT_IMAGE": "rag-step5-streamlit:21271bf"
+  }
 }
