@@ -26,6 +26,10 @@ RUN set -eux; \
 # 设置工作目录
 WORKDIR /app
 
+# Streamlit adds /app/frontend for its entrypoint imports; package imports also
+# need /app when launched by the streamlit console script.
+ENV PYTHONPATH=/app
+
 # 安装系统依赖
 RUN apt-get update && apt-get install -y \
   curl \
