@@ -1,5 +1,8 @@
 # Step5 本地固定交付清单（2026-10-17）
 
+当前部署状态、用户验收及维护边界见[部署收尾总览](step5-deployment-baseline-20261020.md)。
+本文原始交付阶段描述保留用于追溯，不作为当前待办清单。
+
 2026-10-19 Streamlit 单服务补丁已部署：当前 `STREAMLIT_IMAGE=rag-step5-streamlit:21271bf`。
 原始 2026-10-17 归档及其他镜像保持不变；恢复部署时须叠加清单的
 `current_image_overrides`，不能仅加载旧包恢复有缺陷的 Streamlit。
